@@ -1,48 +1,52 @@
 # 🖨️ 3D Print Cost Calculator
 
-A modern, browser-based 3D print cost calculator that uses **Cura-like algorithms** to accurately estimate filament weight and printing costs. Simply drag & drop your STL file and get instant cost predictions!
+A modern, browser-based 3D print cost calculator that uses **Cura-like approach** to estimate filament weight and printing costs. Simply drag & drop your STL file and get instant cost predictions!
 
-![3D Print Cost Calculator](https://img.shields.io/badge/version-1.1.0-blue)
+![3D Print Cost Calculator](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Made with](https://img.shields.io/badge/made%20with-Three.js-black)
 
 ## ✨ Features
 
-- 🎯 **Accurate Cura-like Calculations** - Uses shell-based algorithm accounting for walls, top/bottom layers
+- 🎯 **Simple Cura-like Calculations** - Weight = Volume × Infill × Density
 - 📁 **Drag & Drop STL Upload** - Simply drag your STL file or click to browse
 - 🎨 **Interactive 3D Viewer** - Rotate, zoom, and inspect your model in real-time
 - 🌙 **Dark/Light Theme** - Beautiful UI with theme switching
-- 🎚️ **Quality Profiles** - Choose from Low, Medium, or High quality presets
+- 🎚️ **4 Quality Profiles** - Low, Standard, Dynamic, Super with dynamic labor cost
 - 💰 **Multiple Materials** - PLA, ABS, PETG with customizable prices
 - 📱 **Responsive Design** - Works on desktop and mobile
 
 ## 🎚️ Quality Profiles
 
-The calculator includes three quality profiles that automatically configure all print settings:
+Four quality profiles with automatically calculated labor costs:
 
-| Profile | Layer Height | Walls | Top/Bottom | Labor Cost |
-|---------|--------------|-------|------------|------------|
-| **Low** | 0.3 mm | 2 | 3 layers | 25 ₺ |
-| **Medium** | 0.2 mm | 4 | 4 layers | 50 ₺ |
-| **High** | 0.12 mm | 5 | 6 layers | 100 ₺ |
+| Profile | Layer Height | Labor Cost |
+|---------|--------------|------------|
+| **Düşük** | 0.28 mm | 20 ₺ |
+| **Standart** | 0.20 mm | 28 ₺ |
+| **Dinamik** | 0.16 mm | 35 ₺ |
+| **Super** | 0.12 mm | 47 ₺ |
 
-Simply select a profile and all settings are applied automatically - no manual configuration needed!
+> **Note:** Labor cost is dynamically calculated based on layer height. Finer layers = more layers = higher labor cost.
 
 ## 🧮 How It Calculates
 
-Unlike simple calculators that just multiply `Volume × Density × Infill%`, this calculator uses a **shell-based algorithm** similar to Cura:
+Simple and accurate weight calculation using the Cura approach:
 
 ```
-Shell Volume = (Surface Area × Wall Thickness) + (XY Area × Top/Bottom Thickness)
-Interior Volume = Total Volume - Shell Volume
-Material Volume = Shell Volume × 100% + Interior Volume × Infill%
-Weight = Material Volume × Material Density
+Weight = (Volume / 1000) × Infill% × Material Density
 ```
 
-This provides much more accurate estimates because:
-- **Walls are always 100% solid** (not affected by infill)
-- **Top/Bottom layers are 100% solid**
-- **Only the interior uses infill percentage**
+| Variable | Description |
+|----------|-------------|
+| **Volume** | Model volume in mm³ (calculated using signed tetrahedron method) |
+| **Infill** | Fill percentage (5% - 100%) |
+| **Density** | Material density (PLA: 1.24, ABS: 1.04, PETG: 1.27 g/cm³) |
+
+Labor cost is calculated dynamically:
+```
+Labor Cost = Base Cost × (0.28 / Layer Height)
+```
 
 ## 🚀 Getting Started
 
@@ -67,20 +71,14 @@ This is a pure client-side application. Just open `index.html` in any modern bro
 | **HTML5 & CSS3** | Modern UI with animations |
 | **STL Parser** | Binary/ASCII STL file support |
 
-## 📐 Volume & Surface Area Calculation
+## 📐 Volume Calculation
 
-### Signed Tetrahedron Method (Volume)
+### Signed Tetrahedron Method
 The volume is calculated using the signed tetrahedron method:
 ```javascript
 V = Σ (p1 · (p2 × p3)) / 6
 ```
 This works correctly even for complex models with holes and cavities.
-
-### Triangle Area Sum (Surface Area)
-Surface area is calculated by summing all triangle areas:
-```javascript
-A = Σ 0.5 × |AB × AC|
-```
 
 ## 📦 Project Structure
 
