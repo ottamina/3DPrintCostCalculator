@@ -141,10 +141,22 @@ body::before {
 }
 
 .logo-icon {
-    width: 24px;
-    height: 24px;
-    color: var(--accent-primary);
-    filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.5));
+    width: 28px;
+    height: 28px;
+    filter: invert(40%) sepia(80%) saturate(2000%) hue-rotate(220deg) brightness(100%) contrast(100%);
+    animation: logoGlow 3s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+
+    0%,
+    100% {
+        filter: invert(40%) sepia(80%) saturate(2000%) hue-rotate(220deg) brightness(100%) contrast(100%) drop-shadow(0 0 5px rgba(99, 102, 241, 0.5));
+    }
+
+    50% {
+        filter: invert(40%) sepia(80%) saturate(2000%) hue-rotate(250deg) brightness(110%) contrast(100%) drop-shadow(0 0 15px rgba(139, 92, 246, 0.8));
+    }
 }
 
 .logo h1 {
