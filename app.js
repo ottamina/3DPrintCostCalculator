@@ -84,6 +84,7 @@ let scene, camera, renderer, controls, currentMesh;
 let modelVolume = 0;
 let modelSurfaceArea = 0;
 let modelDimensions = { x: 0, y: 0, z: 0 };
+let rawStlBuffer = null; // Ham STL verisi (Slicing için gerekli)
 
 function initThreeJS() {
     // Scene
@@ -160,6 +161,7 @@ function loadSTL(file) {
     const reader = new FileReader();
     reader.onload = function (event) {
         const contents = event.target.result;
+        rawStlBuffer = contents; // Slicing için sakla
 
         const loader = new THREE.STLLoader();
         const geometry = loader.parse(contents);
@@ -296,17 +298,111 @@ function updateDimensions(x, y, z) {
     elements.dimZ.textContent = z.toFixed(2) + ' mm';
 }
 
-// ===== Cost Calculation (Cura Approach) =====
-// Basit formül: Ağırlık = Hacim × Doluluk × Yoğunluk
-function calculateCost() {
+// ===== Cost Calculation (Advanced: Cura WASM + Fallback) =====
+
+// Cura WASM Slicing Helper
+async function sliceModel(stlBuffer, profile) {
+    try {
+        // Dinamik import ile kütüphaneyi çek (CDN)
+        const { CuraWASM } = await import('https://esm.sh/cura-wasm');
+
+        // Slicer örneği oluştur
+        const slicer = new CuraWASM({
+            definition: 'ultimaker_s5', // Standart bir yazıcı tanımı
+        });
+
+        // Dosyayı yükle
+        await slicer.loadModel(stlBuffer, 'model.stl');
+
+        // Ayarları hazırla
+        const settings = {
+            layer_height: profile.layerHeight,
+            wall_line_count: profile.wallCount,
+            top_layers: profile.topLayers,
+            bottom_layers: profile.bottomLayers,
+            infill_sparse_density: parseInt(elements.infillSlider.value),
+            material_density: MATERIALS[elements.materialSelect.value].density,
+            speed_print: 60,
+        };
+
+        // Dilimle
+        const { metadata } = await slicer.slice(settings);
+
+        // Metadata'dan filament kullanımını (mm) al
+        // Genelde 'filament_used' veya benzeri bir field döner
+        // Cura Engine çıktısı: flavor, time, filament_total_length vb.
+        return metadata;
+    } catch (error) {
+        throw error;
+    }
+}
+
+// Ana Hesaplama Fonksiyonu
+async function calculateCost() {
     if (modelVolume === 0) {
-        elements.weightDisplay.textContent = '-- g';
-        elements.materialCostDisplay.textContent = '-- ₺';
-        elements.totalPrice.textContent = '-- ₺';
-        elements.laborCostDisplay.textContent = '-- ₺'; // Also clear labor cost
+        updateUIDisplay(0, 0, 0, 0);
         return;
     }
 
+    showLoader(true); // İşlem uzun sürebilir
+
+    try {
+        // 1. Önce Gerçek Dilimleme'yi (Cura) dene
+        await calculateCostWithCura();
+    } catch (error) {
+        console.warn('Cura slicing failed, falling back to estimation:', error);
+        // Hata olursa (örn: internet yok, wasm hatası) eski yönteme (tahmin) düş
+        calculateCostEstimation();
+    } finally {
+        showLoader(false);
+    }
+}
+
+// Yöntem 1: Cura WASM ile Gerçek Hesaplama
+async function calculateCostWithCura() {
+    if (!rawStlBuffer) throw new Error("No STL buffer");
+
+    // UI'da bilgi ver
+    elements.totalPrice.textContent = 'Hesaplanıyor...';
+
+    // Profili al
+    const profile = QUALITY_PROFILES[currentQuality];
+
+    // Dilimle
+    const metadata = await sliceModel(rawStlBuffer, profile);
+
+    // Filament uzunluğu (mm) -> Ağırlık (g) çevirimi
+    // Filament çapı varsayılan 1.75mm veya 2.85mm (CuraEngine genelde 2.85 kullanır ama ayarlara bağlı)
+    // Şimdilik metadata'dan doğrudan ağırlık almayı deneyeceğiz veya hacimden gideceğiz
+
+    // NOT: Cura-wasm metadata yapısı kütüphane versiyonuna göre değişebilir.
+    // Standart çıktıda 'filament_weight' varsa onu kullanırız, yoksa 'filament_amount' (mm³) kullanırız.
+
+    let weight = 0;
+    const material = MATERIALS[elements.materialSelect.value];
+
+    if (metadata.filament_weight) {
+        weight = metadata.filament_weight;
+    } else if (metadata.filament_amount) {
+        // Amount genelde mm³ cinsindendir (volume)
+        const volumeCm3 = metadata.filament_amount / 1000;
+        weight = volumeCm3 * material.density;
+    } else {
+        // Eğer veri çekilemezse hata fırlat ve fallback'e düş
+        throw new Error("Invalid metadata");
+    }
+
+    // Fiyat hesabı
+    const pricePerGram = material.pricePerKg / 1000;
+    const materialCost = weight * pricePerGram;
+    const laborCost = calculateLaborCost(profile.layerHeight);
+    const totalCost = materialCost + laborCost;
+
+    updateUIDisplay(weight, materialCost, laborCost, totalCost);
+}
+
+// Yöntem 2: Geometrik Tahmin (Eski Yöntem - Fallback)
+function calculateCostEstimation() {
     // Get selected material
     const materialType = elements.materialSelect.value;
     const material = MATERIALS[materialType];
@@ -317,53 +413,32 @@ function calculateCost() {
     // Get current quality profile
     const profile = QUALITY_PROFILES[currentQuality];
 
-    // Cura Yaklaşımı (Gelişmiş Hesaplama):
-    // 1. Kabuk (Shell) Hacmi - Tamamen dolu (%100)
-    // 2. İç (Interior) Hacmi - Doluluk oranına göre (infill %)
-
-    // Kabuk kalınlıklarını hesapla (mm cinsinden)
-    // Varsayılan nozzle: 0.4mm
+    // Kabuk hesaplamaları (Eski mantık)
     const nozzleSize = 0.4;
     const wallThick = profile.wallCount * nozzleSize;
     const topThick = profile.topLayers * profile.layerHeight;
     const bottomThick = profile.bottomLayers * profile.layerHeight;
-
-    // Ortalama kabuk kalınlığı = (Duvarlar + Üst + Alt) / 2 (basitleştirilmiş ortalama)
-    // Bu, modelin tüm yüzeyine yayılmış ortalama bir kalınlıktır
     const avgShellThick = (wallThick + topThick + bottomThick) / 2;
 
-    // Kabuk Hacmi = Yüzey Alanı * Ortalama Kalınlık
-    // (Yüzey alanı zaten üçgen alanlarının toplamından geliyor)
     let shellVolume = modelSurfaceArea * avgShellThick;
+    if (shellVolume > modelVolume) shellVolume = modelVolume;
 
-    // Güvenlik kontrolü: Kabuk hacmi, toplam hacimden büyük olamaz (küçük modeller için)
-    if (shellVolume > modelVolume) {
-        shellVolume = modelVolume; // Tamamen dolu (%100 Infill gibi davranır)
-    }
-
-    // İç Hacim = Toplam Hacim - Kabuk Hacmi
     const interiorVolume = Math.max(0, modelVolume - shellVolume);
-
-    // Toplam Malzeme Hacmi
-    // Kabuk %100 doludur (1.0 çarpanı)
-    // İç kısım infill oranına göre doludur
     const materialVolume = shellVolume + (interiorVolume * infill);
 
-    // mm³ to cm³ conversion: / 1000
     const volumeCm3 = materialVolume / 1000;
     const weight = volumeCm3 * material.density;
 
-    // Calculate material cost
     const pricePerGram = material.pricePerKg / 1000;
     const materialCost = weight * pricePerGram;
-
-    // Dinamik işçilik hesaplama (layer height'e göre)
     const laborCost = calculateLaborCost(profile.layerHeight);
-
-    // Calculate total
     const totalCost = materialCost + laborCost;
 
-    // Update UI
+    updateUIDisplay(weight, materialCost, laborCost, totalCost);
+}
+
+// UI Güncelleme Yardımcısı
+function updateUIDisplay(weight, materialCost, laborCost, totalCost) {
     elements.weightDisplay.textContent = weight.toFixed(2) + ' g';
     elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
     elements.laborCostDisplay.textContent = laborCost.toFixed(2) + ' ₺';
