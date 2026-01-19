@@ -1,40 +1,35 @@
-# 3D Baskı Maliyet Hesaplayıcı (v2.5)
+# 3D Print Cost Calculator
 
-Kullanıcı dostu, hızlı ve tarayıcı tabanlı 3D baskı maliyet analiz aracı.
+A browser-based tool for estimating 3D printing costs using STL files.
 
-## 🚀 Özellikler
+## ✨ Features
 
-- **Anlık Geometrik Hesaplama:** STL dosyanızı yüklediğiniz anda Hacim, Yüzey Alanı ve Ağırlık hesaplanır.
-- **Dinamik Fiyatlandırma:** Baskı kalitesine göre değişen hizmet bedeli.
-  - **Düşük (x0.25):** Hızlı, taslak baskılar.
-  - **Orta (x0.5):** Fonksiyonel.
-  - **Standart (x1.0):** Dengeli.
-  - **Yüksek (x1.5):** Pürüzsüz yüzey.
-- **Malzeme Desteği:** PLA, ABS, PETG.
-- **Görsel:** Simsiyah (OLED dostu) arka plan ve modern arayüz.
-- **Güvenli:** Tüm işlemler tarayıcınızda yapılır, sunucuya dosya gönderilmez.
+- **Instant Analysis:** Upload your STL file and get volume, surface area, and estimated weight instantly.
+- **Material Support:** PLA, ABS, PETG with accurate density calculations.
+- **Quality Profiles:** Choose from Low, Medium, Standard, or High quality presets.
+- **Dark Theme:** OLED-friendly black background with a modern UI.
+- **Privacy First:** All calculations are done locally in your browser. No files are uploaded to any server.
 
-## 🛠 Kullanılan Teknolojiler
+## 🛠 Technologies
 
-- **Three.js:** 3D Görüntüleme ve Geometri Analizi.
-- **Vanilla JS (ES6+):** Performanslı mantıksal işlemler.
-- **CSS3 Variables:** Kolay tema yönetimi.
+- **Three.js** - 3D Rendering & Geometry Analysis
+- **Vanilla JavaScript (ES6+)** - Core Logic
+- **HTML5 & CSS3** - Responsive UI with CSS Variables
 
-## 📦 Kurulum
+## 🚀 Usage
 
-Bu proje **static web sitesi** olarak çalışır. Herhangi bir backend kurulumu gerektirmez.
-
-1. Repoyu klonlayın:
+1. Clone the repository:
    ```bash
    git clone https://github.com/ottamina/3DPrintCostCalculator.git
    ```
-2. Klasöre gidin ve `index.html` dosyasını tarayıcınızda açın.
+2. Open `index.html` in your browser.
+3. Drop your STL file and see the magic!
 
-## 🤝 Geliştirici
+## 👤 Developer
 
 **Osman Teksoy**
 - [LinkedIn](https://linkedin.com/in/osmanteksoy)
 - [GitHub](https://github.com/ottamina)
 
 ---
-*Not: Bu araç tahmini maliyet sunar, profesyonel dilimleyicilerle (Cura, PrusaSlicer) birebir aynı sonucu garanti etmez ancak %98 oranında yakındır.*
+*Note: This tool provides estimates. Results may vary slightly from professional slicers like Cura or PrusaSlicer.*
