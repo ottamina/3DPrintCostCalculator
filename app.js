@@ -327,6 +327,7 @@ async function getWeightFromCura() {
         bottom_layers: 4,
         infill_sparse_density: parseInt(elements.infillSlider.value),
         infill_line_distance: 0,
+        infill_pattern: 'grid', // Infill pattern eklendi
         material_density: MATERIALS[elements.materialSelect.value].density,
         speed_print: 60,
     };
