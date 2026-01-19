@@ -3,25 +3,25 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
-// --- CONFIGURATION ---
+//materyaller
 const MATERIALS = {
     'PLA': { density: 1.24, pricePerKg: 700 }, // g/cm3, TL
     'ABS': { density: 1.04, pricePerKg: 700 },
     'PETG': { density: 1.27, pricePerKg: 700 }
 };
 
-const LABOR_COST = 50; // Sabit Hizmet Bedeli (TL)
 
-// --- STATE ---
+
+// STATe
 let scene, camera, renderer, controls;
 let currentMesh = null;
 let debounceTimer = null;
 
-// Global Model Data (Cura yerine Geometrik Hesaplama için)
+// Global Model Data
 let modelVolumeMm3 = 0;
 let modelSurfaceAreaMm2 = 0;
 
-// --- ELEMENTS ---
+// ELEMENTS
 const elements = {
     dropzone: document.getElementById('dropzone'),
     fileInput: document.getElementById('file-input'),
@@ -46,7 +46,7 @@ const elements = {
     changeModelBtn: document.getElementById('change-model-btn')
 };
 
-// --- INITIALIZATION ---
+// INITIALIZATION
 initThreeJS();
 setupEventListeners();
 
@@ -83,7 +83,7 @@ function initThreeJS() {
     dirLight.shadow.mapSize.height = 2048;
     scene.add(dirLight);
 
-    // Grid (Zemin)
+    // Grid
     const gridHelper = new THREE.GridHelper(400, 40, 0x333333, 0x444444); // Darker grid
     scene.add(gridHelper);
 
@@ -110,7 +110,7 @@ function setupEventListeners() {
     elements.dropzone.addEventListener('click', () => elements.fileInput.click());
     elements.fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
 
-    // Drag & Drop
+    // DragDrop
     elements.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); elements.dropzone.classList.add('dragover'); });
     elements.dropzone.addEventListener('dragleave', () => elements.dropzone.classList.remove('dragover'));
     elements.dropzone.addEventListener('drop', (e) => {
@@ -129,7 +129,7 @@ function setupEventListeners() {
             btn.classList.toggle('active', parseInt(btn.dataset.value) == val)
         );
 
-        // Instant Calculation (Fast Debounce)
+        // Instant Calculation 
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(calculateCost, 100); // 100ms
     });
@@ -183,7 +183,7 @@ function setupEventListeners() {
     }
 }
 
-// --- LOGIC ---
+// LOGIC 
 
 function loadFile(file) {
     if (!file) return;
@@ -208,7 +208,7 @@ function loadFile(file) {
         elements.dimHeight.textContent = size.y.toFixed(1);
         elements.dimWidth.textContent = size.z.toFixed(1);
 
-        // 2. Pre-calculate Geometric Data for "Cura-like" Estimation
+        //
         modelVolumeMm3 = getGeometricVolume(geometry);
         modelSurfaceAreaMm2 = getGeometricSurfaceArea(geometry);
 
@@ -259,10 +259,10 @@ function calculateCost() {
         const infill = parseInt(elements.infillSlider.value) / 100;
         const material = MATERIALS[elements.materialSelect.value];
 
-        // --- Hizmet Bedeli Hesaplama ---
-        // Formül: (Hacim cm3 * Kalite Katsayısı) + 20 TL
-        // Hacim için geometrik hacmi kullanıyoruz (volumeCm3)
-        // Öncelikle seçili kaliteyi bul
+        // Hizmet Bedeli Hesaplama 
+        // (Hacim cm3 * Kalite Katsayısı) + 20 TL
+        // 
+        // 
         let qualityFactor = 1.0;
         elements.qualityBtns.forEach(btn => {
             if (btn.classList.contains('active')) qualityFactor = parseFloat(btn.dataset.factor);
@@ -271,8 +271,7 @@ function calculateCost() {
         const modelVolumeCm3 = modelVolumeMm3 / 1000;
         const laborCost = (modelVolumeCm3 * qualityFactor) + 20;
 
-        // --- Geometrik Tahmin Algoritması (Cura Alternatifi) ---
-        // Kabuk Kalınlığı: 0.8mm (2 Duvar)
+        
         const shellThickness = 0.8;
 
         // Kabuk Hacmi (Yaklaşık): Yüzey Alanı * Kalınlık
@@ -307,7 +306,7 @@ function calculateCost() {
     }
 }
 
-// --- HELPERS ---
+//  HELPERS
 
 function showLoader(show, text = "Yükleniyor...") {
     if (elements.loader) {
