@@ -31,5 +31,9 @@ A browser-based tool for estimating 3D printing costs using STL files.
 - [LinkedIn](https://linkedin.com/in/osmanteksoy)
 - [GitHub](https://github.com/ottamina)
 
+### 🙏 Special Thanks
+
+**Muhammet Sarımehmet** - For valuable contributions and support.
+
 ---
 *Note: This tool provides estimates. Results may vary slightly from professional slicers like Cura or PrusaSlicer.*

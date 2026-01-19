@@ -156,6 +156,12 @@ body::before {
     background-clip: text;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
 /* Theme Toggle Button */
 .theme-toggle {
     display: flex;
