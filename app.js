@@ -36,11 +36,36 @@ const elements = {
 };
 
 // Quality Profile Presets - Sadece layer height içerir, işçilik dinamik hesaplanır
+// Quality Profile Presets - UI'da sadece layer height görünür ancak hesaplama için profil detayları kullanılır
 const QUALITY_PROFILES = {
-    low: { name: 'Düşük', layerHeight: 0.28 },
-    standard: { name: 'Standart', layerHeight: 0.20 },
-    dynamic: { name: 'Dinamik', layerHeight: 0.16 },
-    super: { name: 'Super', layerHeight: 0.12 }
+    low: {
+        name: 'Düşük',
+        layerHeight: 0.28,
+        wallCount: 2,     // Arka plan hesaplama değeri
+        topLayers: 3,     // Arka plan hesaplama değeri
+        bottomLayers: 3   // Arka plan hesaplama değeri
+    },
+    standard: {
+        name: 'Standart',
+        layerHeight: 0.20,
+        wallCount: 3,
+        topLayers: 4,
+        bottomLayers: 4
+    },
+    dynamic: {
+        name: 'Dinamik',
+        layerHeight: 0.16,
+        wallCount: 4,
+        topLayers: 5,
+        bottomLayers: 5
+    },
+    super: {
+        name: 'Super',
+        layerHeight: 0.12,
+        wallCount: 5,
+        topLayers: 6,
+        bottomLayers: 6
+    }
 };
 
 let currentQuality = 'standard';
@@ -292,10 +317,41 @@ function calculateCost() {
     // Get current quality profile
     const profile = QUALITY_PROFILES[currentQuality];
 
-    // Cura yaklaşımı: Hacim × Doluluk × Yoğunluk
+    // Cura Yaklaşımı (Gelişmiş Hesaplama):
+    // 1. Kabuk (Shell) Hacmi - Tamamen dolu (%100)
+    // 2. İç (Interior) Hacmi - Doluluk oranına göre (infill %)
+
+    // Kabuk kalınlıklarını hesapla (mm cinsinden)
+    // Varsayılan nozzle: 0.4mm
+    const nozzleSize = 0.4;
+    const wallThick = profile.wallCount * nozzleSize;
+    const topThick = profile.topLayers * profile.layerHeight;
+    const bottomThick = profile.bottomLayers * profile.layerHeight;
+
+    // Ortalama kabuk kalınlığı = (Duvarlar + Üst + Alt) / 2 (basitleştirilmiş ortalama)
+    // Bu, modelin tüm yüzeyine yayılmış ortalama bir kalınlıktır
+    const avgShellThick = (wallThick + topThick + bottomThick) / 2;
+
+    // Kabuk Hacmi = Yüzey Alanı * Ortalama Kalınlık
+    // (Yüzey alanı zaten üçgen alanlarının toplamından geliyor)
+    let shellVolume = modelSurfaceArea * avgShellThick;
+
+    // Güvenlik kontrolü: Kabuk hacmi, toplam hacimden büyük olamaz (küçük modeller için)
+    if (shellVolume > modelVolume) {
+        shellVolume = modelVolume; // Tamamen dolu (%100 Infill gibi davranır)
+    }
+
+    // İç Hacim = Toplam Hacim - Kabuk Hacmi
+    const interiorVolume = Math.max(0, modelVolume - shellVolume);
+
+    // Toplam Malzeme Hacmi
+    // Kabuk %100 doludur (1.0 çarpanı)
+    // İç kısım infill oranına göre doludur
+    const materialVolume = shellVolume + (interiorVolume * infill);
+
     // mm³ to cm³ conversion: / 1000
-    const volumeCm3 = modelVolume / 1000;
-    const weight = volumeCm3 * infill * material.density;
+    const volumeCm3 = materialVolume / 1000;
+    const weight = volumeCm3 * material.density;
 
     // Calculate material cost
     const pricePerGram = material.pricePerKg / 1000;
