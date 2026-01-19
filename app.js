@@ -321,13 +321,26 @@ async function getWeightFromCura() {
 
     // SABİT STANDART AYARLAR (Masaüstü Cura Standartlarına Ayarlandı)
     const settings = {
+        // 1. Destekleri Tamamen Kapat
+        support_enable: false,
+        support_infill_rate: 0,
+
+        // 2. Infill Tuning (Düşük Doluluk Hassasiyeti)
+        gradual_infill_steps: 0,        // Kademeli dolguyu kapat
+        infill_enable_travel_optimization: false,
+        minimum_infill_area: 0,         // Küçük alanları %100 doldurmayı engelle
+        infill_before_walls: false,
+        infill_overlap: 5,              // Bindirmeyi azalt
+        skin_overlap: 5,
+
+        // 3. Standart Ayarlar
         layer_height: 0.20,
-        wall_line_count: 2,     // 3 -> 2 (Standart)
+        wall_line_count: 2,     // 2 Duvar
         top_layers: 4,
         bottom_layers: 4,
         infill_sparse_density: parseInt(elements.infillSlider.value),
         infill_line_distance: 0,
-        infill_pattern: 'grid', // Infill pattern eklendi
+        infill_pattern: 'grid',
         material_density: MATERIALS[elements.materialSelect.value].density,
         speed_print: 60,
     };
