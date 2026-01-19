@@ -30,7 +30,9 @@ const elements = {
     materialSelect: document.getElementById('material-select'),
     infillSlider: document.getElementById('infill-slider'),
     infillValue: document.getElementById('infill-value'),
-    presetBtns: document.querySelectorAll('.preset-btn'),
+    presetBtns: document.querySelectorAll('.preset-btn:not(.quality-btn)'),
+    qualityBtns: document.querySelectorAll('.quality-btn'),
+    qualityDesc: document.getElementById('quality-desc'),
     // Outputs
     dimLength: document.getElementById('dim-x'),
     dimWidth: document.getElementById('dim-y'),
@@ -143,6 +145,27 @@ function setupEventListeners() {
         });
     });
 
+    // Quality Buttons
+    elements.qualityBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Active state
+            elements.qualityBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Description update
+            const factor = parseFloat(btn.dataset.factor);
+            let desc = "";
+            if (factor === 0.5) desc = "Hızlı ve ekonomik (Taslaklar için).";
+            else if (factor === 1.0) desc = "Standart kalite, dengeli baskı.";
+            else if (factor === 1.5) desc = "Pürüzsüz yüzeyler, yüksek detay.";
+            else if (factor === 2.0) desc = "Maksimum detay ve estetik.";
+
+            if (elements.qualityDesc) elements.qualityDesc.textContent = desc;
+
+            calculateCost();
+        });
+    });
+
     // Change Model Button
     if (elements.changeModelBtn) {
         elements.changeModelBtn.addEventListener('click', () => {
@@ -226,7 +249,18 @@ function calculateCost() {
     try {
         const infill = parseInt(elements.infillSlider.value) / 100;
         const material = MATERIALS[elements.materialSelect.value];
-        const laborCost = LABOR_COST;
+
+        // --- Hizmet Bedeli Hesaplama ---
+        // Formül: (Hacim cm3 * Kalite Katsayısı) + 20 TL
+        // Hacim için geometrik hacmi kullanıyoruz (volumeCm3)
+        // Öncelikle seçili kaliteyi bul
+        let qualityFactor = 1.0;
+        elements.qualityBtns.forEach(btn => {
+            if (btn.classList.contains('active')) qualityFactor = parseFloat(btn.dataset.factor);
+        });
+
+        const modelVolumeCm3 = modelVolumeMm3 / 1000;
+        const laborCost = (modelVolumeCm3 * qualityFactor) + 20;
 
         // --- Geometrik Tahmin Algoritması (Cura Alternatifi) ---
         // Kabuk Kalınlığı: 0.8mm (2 Duvar)
@@ -253,7 +287,7 @@ function calculateCost() {
         // UI Update
         elements.weightDisplay.textContent = Math.round(weight) + ' g';
         elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
-        elements.laborCostDisplay.textContent = laborCost + ' ₺';
+        elements.laborCostDisplay.textContent = Math.ceil(laborCost) + ' ₺'; // Yuvarlanmış Hizmet Bedeli
         elements.totalPrice.textContent = Math.ceil(totalCost) + ' ₺';
 
     } catch (e) {
