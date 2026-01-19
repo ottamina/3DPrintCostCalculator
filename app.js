@@ -44,24 +44,33 @@ const elements = {
 const QUALITY_PROFILES = {
     low: {
         name: 'Düşük',
-        layerHeight: 0.3,
+        layerHeight: 0.28,
         wallCount: 2,
         lineWidth: 0.5,
         topLayers: 3,
         bottomLayers: 3,
-        laborCost: 25
+        laborCost: 20
     },
-    medium: {
-        name: 'Orta',
-        layerHeight: 0.2,
-        wallCount: 4,
+    standard: {
+        name: 'Standart',
+        layerHeight: 0.20,
+        wallCount: 3,
         lineWidth: 0.4,
         topLayers: 4,
         bottomLayers: 4,
-        laborCost: 50
+        laborCost: 40
     },
-    high: {
-        name: 'Yüksek',
+    dynamic: {
+        name: 'Dinamik',
+        layerHeight: 0.16,
+        wallCount: 4,
+        lineWidth: 0.4,
+        topLayers: 5,
+        bottomLayers: 5,
+        laborCost: 60
+    },
+    super: {
+        name: 'Super',
         layerHeight: 0.12,
         wallCount: 5,
         lineWidth: 0.4,
@@ -71,7 +80,7 @@ const QUALITY_PROFILES = {
     }
 };
 
-let currentQuality = 'medium';
+let currentQuality = 'standard';
 
 // Three.js Setup 
 let scene, camera, renderer, controls, currentMesh;
@@ -291,6 +300,9 @@ function updateDimensions(x, y, z) {
 }
 
 // ===== Cost Calculation (Cura-like algorithm) =====
+// Cura uses: Material Volume = Shell Volume + (Interior Volume × Infill)
+// Shell Volume = Surface Area × Wall Thickness (approximated)
+// Interior Volume = Total Volume - Shell Volume
 function calculateCost() {
     if (modelVolume === 0) {
         elements.weightDisplay.textContent = '-- g';
@@ -306,51 +318,39 @@ function calculateCost() {
     // Get infill percentage
     const infill = parseInt(elements.infillSlider.value) / 100;
 
-    // Get print settings
-    const wallCount = parseInt(elements.wallCount.value) || 4;
-    const layerHeight = parseFloat(elements.layerHeight.value) || 0.2;
-    const lineWidth = parseFloat(elements.lineWidth.value) || 0.4;
-    const topLayers = parseInt(elements.topLayers.value) || 4;
-    const bottomLayers = parseInt(elements.bottomLayers.value) || 4;
+    // Get print settings from current quality profile
+    const profile = QUALITY_PROFILES[currentQuality];
+    const wallCount = profile.wallCount;
+    const layerHeight = profile.layerHeight;
+    const lineWidth = profile.lineWidth;
+    const topLayers = profile.topLayers;
+    const bottomLayers = profile.bottomLayers;
+    const laborCost = profile.laborCost;
 
-    // Get labor cost from current quality profile
-    const laborCost = QUALITY_PROFILES[currentQuality].laborCost;
+    // Calculate shell thicknesses in mm
+    const wallThickness = wallCount * lineWidth;
+    const topBottomThickness = (topLayers + bottomLayers) * layerHeight;
 
-    // Calculate shell thickness
-    const wallThickness = wallCount * lineWidth; // mm
-    const topThickness = topLayers * layerHeight; // mm
-    const bottomThickness = bottomLayers * layerHeight; // mm
+    // Cura-like shell volume calculation:
+    // Shell volume = Surface Area × Average Shell Thickness
+    // We use wall thickness as primary, adjusted for top/bottom
+    const avgShellThickness = (wallThickness * 2 + topBottomThickness) / 3;
 
-    // Calculate shell volume using a more realistic approach
-    // Instead of surface area * thickness (which overestimates),
-    // we estimate based on typical shell-to-volume ratio
+    // Shell volume from surface area (mm³)
+    // Surface area is already calculated during model load
+    let shellVolume = modelSurfaceArea * avgShellThickness;
 
-    // Calculate approximate dimensions for shell estimation
-    const avgDimension = Math.cbrt(modelVolume); // Approximate average dimension
-    const minDimension = Math.min(modelDimensions.x, modelDimensions.y, modelDimensions.z);
+    // Clamp shell volume to not exceed total volume (for small/thin models)
+    shellVolume = Math.min(shellVolume, modelVolume * 0.95);
 
-    // Effective wall thickness cannot exceed half the minimum dimension
-    const effectiveWallThickness = Math.min(wallThickness, minDimension / 2);
-    const effectiveTopBottom = Math.min(topThickness + bottomThickness, modelDimensions.z / 2);
+    // Interior volume is what remains after shell
+    const interiorVolume = Math.max(0, modelVolume - shellVolume);
 
-    // Estimate shell volume based on the model being hollow with walls
-    // Shell volume ≈ Total volume - Interior volume (where interior is shrunk by wall thickness)
-    const interiorScale = Math.max(0, 1 - (2 * effectiveWallThickness / avgDimension));
-    const verticalScale = Math.max(0, 1 - (effectiveTopBottom / modelDimensions.z));
+    // Total material volume: full shell + infill portion of interior
+    const materialVolume = shellVolume + (interiorVolume * infill);
 
-    // Interior volume estimation (cubic scaling for walls + linear for top/bottom)
-    const interiorVolumeRatio = Math.pow(interiorScale, 2) * verticalScale;
-    const interiorVolume = modelVolume * Math.max(0.05, interiorVolumeRatio); // At least 5% interior
-
-    // Shell volume is what remains
-    let shellVolume = modelVolume - interiorVolume;
-
-    // Calculate actual material volume
-    // Shell: 100% solid, Interior: infill%
-    const actualMaterialVolume = shellVolume + (interiorVolume * infill);
-
-    // Convert to cm³ and calculate weight
-    const volumeCm3 = actualMaterialVolume / 1000;
+    // Convert mm³ to cm³ and calculate weight in grams
+    const volumeCm3 = materialVolume / 1000;
     const weight = volumeCm3 * material.density;
 
     // Calculate material cost
@@ -515,5 +515,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Apply initial quality profile
-    applyQualityProfile('medium');
+    applyQualityProfile('standard');
 });

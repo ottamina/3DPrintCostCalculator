@@ -127,16 +127,21 @@
                         <div class="profile-info-grid">
                             <div class="profile-info-item">
                                 <span class="profile-info-name">Düşük</span>
-                                <span class="profile-info-details">0.3mm katman • 2 duvar • 3 üst/alt • 25₺
+                                <span class="profile-info-details">0.28mm katman • 2 duvar • 3 üst/alt • 20₺
                                     işçilik</span>
                             </div>
                             <div class="profile-info-item">
-                                <span class="profile-info-name">Orta</span>
-                                <span class="profile-info-details">0.2mm katman • 4 duvar • 4 üst/alt • 50₺
+                                <span class="profile-info-name">Standart</span>
+                                <span class="profile-info-details">0.20mm katman • 3 duvar • 4 üst/alt • 40₺
                                     işçilik</span>
                             </div>
                             <div class="profile-info-item">
-                                <span class="profile-info-name">Yüksek</span>
+                                <span class="profile-info-name">Dinamik</span>
+                                <span class="profile-info-details">0.16mm katman • 4 duvar • 5 üst/alt • 60₺
+                                    işçilik</span>
+                            </div>
+                            <div class="profile-info-item">
+                                <span class="profile-info-name">Super</span>
                                 <span class="profile-info-details">0.12mm katman • 5 duvar • 6 üst/alt • 100₺
                                     işçilik</span>
                             </div>
@@ -187,16 +192,17 @@
                     <h3>Baskı Kalitesi</h3>
                     <div class="quality-profile-selector">
                         <button class="quality-btn" data-quality="low">Düşük</button>
-                        <button class="quality-btn active" data-quality="medium">Orta</button>
-                        <button class="quality-btn" data-quality="high">Yüksek</button>
+                        <button class="quality-btn active" data-quality="standard">Standart</button>
+                        <button class="quality-btn" data-quality="dynamic">Dinamik</button>
+                        <button class="quality-btn" data-quality="super">Super</button>
                     </div>
                     <!-- Hidden inputs for print settings - controlled by quality profile -->
-                    <input type="hidden" id="wall-count" value="4">
+                    <input type="hidden" id="wall-count" value="3">
                     <input type="hidden" id="layer-height" value="0.2">
                     <input type="hidden" id="line-width" value="0.4">
                     <input type="hidden" id="top-layers" value="4">
                     <input type="hidden" id="bottom-layers" value="4">
-                    <input type="hidden" id="labor-cost-value" value="50">
+                    <input type="hidden" id="labor-cost-value" value="40">
                 </div>
 
 
