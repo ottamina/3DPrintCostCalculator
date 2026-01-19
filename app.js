@@ -321,24 +321,29 @@ function calculateCost() {
     const topThickness = topLayers * layerHeight; // mm
     const bottomThickness = bottomLayers * layerHeight; // mm
 
-    // Calculate shell volume (100% solid)
-    // Shell volume = Surface Area * Wall Thickness + Top/Bottom adjustment
-    // This is an approximation based on the outer surface area
-    const wallVolume = modelSurfaceArea * wallThickness; // mm³
+    // Calculate shell volume using a more realistic approach
+    // Instead of surface area * thickness (which overestimates),
+    // we estimate based on typical shell-to-volume ratio
 
-    // Top and bottom solid layers (simplified calculation based on XY area)
-    // Approximate XY area from bounding box
-    const xyArea = modelDimensions.x * modelDimensions.y;
-    const topBottomVolume = xyArea * (topThickness + bottomThickness); // mm³
+    // Calculate approximate dimensions for shell estimation
+    const avgDimension = Math.cbrt(modelVolume); // Approximate average dimension
+    const minDimension = Math.min(modelDimensions.x, modelDimensions.y, modelDimensions.z);
 
-    // Total shell volume (100% solid parts)
-    let shellVolume = wallVolume + topBottomVolume;
+    // Effective wall thickness cannot exceed half the minimum dimension
+    const effectiveWallThickness = Math.min(wallThickness, minDimension / 2);
+    const effectiveTopBottom = Math.min(topThickness + bottomThickness, modelDimensions.z / 2);
 
-    // Make sure shell volume doesn't exceed total volume
-    shellVolume = Math.min(shellVolume, modelVolume);
+    // Estimate shell volume based on the model being hollow with walls
+    // Shell volume ≈ Total volume - Interior volume (where interior is shrunk by wall thickness)
+    const interiorScale = Math.max(0, 1 - (2 * effectiveWallThickness / avgDimension));
+    const verticalScale = Math.max(0, 1 - (effectiveTopBottom / modelDimensions.z));
 
-    // Interior volume (uses infill percentage)
-    const interiorVolume = Math.max(0, modelVolume - shellVolume);
+    // Interior volume estimation (cubic scaling for walls + linear for top/bottom)
+    const interiorVolumeRatio = Math.pow(interiorScale, 2) * verticalScale;
+    const interiorVolume = modelVolume * Math.max(0.05, interiorVolumeRatio); // At least 5% interior
+
+    // Shell volume is what remains
+    let shellVolume = modelVolume - interiorVolume;
 
     // Calculate actual material volume
     // Shell: 100% solid, Interior: infill%
