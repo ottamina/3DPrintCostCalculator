@@ -48,8 +48,8 @@ setupEventListeners();
 function initThreeJS() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f7); // Light gray
-    scene.fog = new THREE.Fog(0xf5f5f7, 200, 1000);
+    scene.background = new THREE.Color(0x000000); // Black background
+    scene.fog = new THREE.Fog(0x000000, 200, 1000);
 
     // Camera
     const aspect = elements.viewerContainer.clientWidth / elements.viewerContainer.clientHeight;
@@ -126,7 +126,7 @@ function setupEventListeners() {
 
         // Debounced Calculation
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(calculateCost, 300); // 300ms gecikme
+        debounceTimer = setTimeout(calculateCost, 100); // 100ms gecikme
     });
 
     // Material Select
