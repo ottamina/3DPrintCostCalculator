@@ -25,35 +25,16 @@ const elements = {
     infillSlider: document.getElementById('infill-slider'),
     infillValue: document.getElementById('infill-value'),
     presetBtns: document.querySelectorAll('.preset-btn'),
-    qualityBtns: document.querySelectorAll('.quality-btn'),
-    laborCostValue: document.getElementById('labor-cost-value'),
     weightDisplay: document.getElementById('weight-display'),
     materialCostDisplay: document.getElementById('material-cost-display'),
     laborCostDisplay: document.getElementById('labor-cost-display'),
     totalPrice: document.getElementById('total-price'),
-    loader: document.getElementById('loader'),
-    layerHeight: document.getElementById('layer-height')
+    loader: document.getElementById('loader')
 };
 
-// Quality Profile Presets - Sadece layer height içerir, işçilik dinamik hesaplanır
-// Quality Profile Presets - Sadece layer height içerir (İşçilik hesabı için)
-const QUALITY_PROFILES = {
-    low: { name: 'Düşük', layerHeight: 0.28 },
-    standard: { name: 'Standart', layerHeight: 0.20 },
-    dynamic: { name: 'Dinamik', layerHeight: 0.16 },
-    super: { name: 'Super', layerHeight: 0.12 }
-};
+// 3. İşçilik Hesabı (SABİT 50 TL)
+// calculateLaborCost fonksiyonu kaldırıldı, recalculateMatrix içinde sabit değer kullanılıyor.
 
-let currentQuality = 'standard';
-
-// Dinamik işçilik hesaplama - Layer height düştükçe işçilik artar
-// Mantık: Daha ince katman = daha fazla katman sayısı = daha uzun süre
-function calculateLaborCost(layerHeight) {
-    const baseCost = 20;  // 0.28mm için baz maliyet
-    const baseLayerHeight = 0.28;
-    const multiplier = baseLayerHeight / layerHeight;
-    return Math.round(baseCost * multiplier);
-}
 
 // Three.js Setup 
 let scene, camera, renderer, controls, currentMesh;
@@ -305,10 +286,8 @@ async function recalculateMatrix() {
         const pricePerGram = material.pricePerKg / 1000;
         const materialCost = weight * pricePerGram;
 
-        // 3. İşçilik Hesabı (Kaliteye Bağlı)
-        // Sadece layerHeight işçiliği etkiler
-        const profile = QUALITY_PROFILES[currentQuality];
-        const laborCost = calculateLaborCost(profile.layerHeight);
+        // 3. İşçilik Hesabı (SABİT)
+        const laborCost = 50;
 
         // 4. Toplam
         const totalCost = materialCost + laborCost;
@@ -340,15 +319,14 @@ async function getWeightFromCura() {
 
     await slicer.loadModel(rawStlBuffer, 'model.stl');
 
-    // SABİT STANDART AYARLAR
-    // Kalite profili ne olursa olsun ağırlık hesabı bunlarla yapılır
+    // SABİT STANDART AYARLAR (Masaüstü Cura Standartlarına Ayarlandı)
     const settings = {
         layer_height: 0.20,
-        wall_line_count: 3,
+        wall_line_count: 2,     // 3 -> 2 (Standart)
         top_layers: 4,
         bottom_layers: 4,
         infill_sparse_density: parseInt(elements.infillSlider.value),
-        infill_line_distance: 0, // Density'nin aktif olması için 0 yapılmalı
+        infill_line_distance: 0,
         material_density: MATERIALS[elements.materialSelect.value].density,
         speed_print: 60,
     };
@@ -379,7 +357,7 @@ function getWeightFromEstimation() {
 
     // SABİT STANDART AYARLAR
     const nozzleSize = 0.4;
-    const fixedWallCount = 3;
+    const fixedWallCount = 2;
     const fixedLayerHeight = 0.20;
     const fixedTopLayers = 4;
     const fixedBottomLayers = 4;
@@ -409,14 +387,7 @@ function updateUIDisplay(weight, materialCost, laborCost, totalCost) {
     elements.totalPrice.textContent = totalCost.toFixed(2) + ' ₺';
 }
 
-// İşçilik Fonksiyonu
-function calculateLaborCost(layerHeight) {
-    const baseCost = 28; // Standart (0.20mm) için baz maliyet
-    const baseLayerHeight = 0.20;
-    // Katman inceldikçe süre ve maliyet artar
-    const multiplier = baseLayerHeight / layerHeight;
-    return Math.round(baseCost * multiplier);
-}
+// İşçilik fonksiyonu kaldırıldı (Sabit 50 TL)
 
 // ===== Loader =====
 function showLoader(show) {
@@ -470,7 +441,8 @@ elements.fileInput.addEventListener('change', (e) => {
 // Material select
 elements.materialSelect.addEventListener('change', recalculateMatrix);
 
-// Infill slider
+// Infill slider (Debounce eklendi)
+let debounceTimer;
 elements.infillSlider.addEventListener('input', (e) => {
     elements.infillValue.textContent = e.target.value + '%';
 
@@ -479,7 +451,11 @@ elements.infillSlider.addEventListener('input', (e) => {
         btn.classList.toggle('active', parseInt(btn.dataset.value) === parseInt(e.target.value));
     });
 
-    calculateCost();
+    // Hesaplamayı gecikmeli başlat (Performans için)
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        recalculateMatrix();
+    }, 800);
 });
 
 // Preset buttons
@@ -492,38 +468,12 @@ elements.presetBtns.forEach(btn => {
         elements.presetBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        calculateCost();
+        recalculateMatrix();
     });
 });
 
-// Quality profile buttons
-function applyQualityProfile(quality) {
-    const profile = QUALITY_PROFILES[quality];
-    if (!profile) return;
+// Quality profile buttons listener removed
 
-    currentQuality = quality;
-
-    // Update hidden input
-    elements.layerHeight.value = profile.layerHeight;
-
-    // Calculate dynamic labor cost
-    const laborCost = calculateLaborCost(profile.layerHeight);
-    elements.laborCostValue.value = laborCost;
-    elements.laborCostDisplay.textContent = laborCost + ' ₺';
-
-    // Update active button
-    elements.qualityBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.quality === quality);
-    });
-
-    recalculateMatrix();
-}
-
-elements.qualityBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        applyQualityProfile(btn.dataset.quality);
-    });
-});
 
 // ===== Theme Toggle =====
 const themeToggle = document.getElementById('theme-toggle');
@@ -562,6 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scene.background = new THREE.Color(bgColor);
     }
 
-    // Apply initial quality profile
-    applyQualityProfile('standard');
+    // Apply initial quality profile removed
+
 });
