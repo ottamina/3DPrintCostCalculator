@@ -1,7 +1,7 @@
 
-import * as THREE from 'https://esm.sh/three@0.160.0';
-import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls?deps=three@0.160.0';
-import { STLLoader } from 'https://esm.sh/three@0.160.0/examples/jsm/loaders/STLLoader?deps=three@0.160.0';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // --- CONFIGURATION ---
 const MATERIALS = {
