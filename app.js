@@ -145,6 +145,15 @@ function setupEventListeners() {
         });
     });
 
+    // Theme Toggle
+    const themeBtn = document.getElementById('theme-toggle');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', () => {
+            const current = document.body.getAttribute('data-theme');
+            document.body.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+        });
+    }
+
     // Quality Buttons
     elements.qualityBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -155,10 +164,10 @@ function setupEventListeners() {
             // Description update
             const factor = parseFloat(btn.dataset.factor);
             let desc = "";
-            if (factor === 0.5) desc = "Hızlı ve ekonomik (Taslaklar için).";
-            else if (factor === 1.0) desc = "Standart kalite, dengeli baskı.";
-            else if (factor === 1.5) desc = "Pürüzsüz yüzeyler, yüksek detay.";
-            else if (factor === 2.0) desc = "Maksimum detay ve estetik.";
+            if (factor === 0.25) desc = "Hızlı baskı, minimum maliyet.";
+            else if (factor === 0.5) desc = "Orta kalite, fonksiyonel parçalar.";
+            else if (factor === 1.0) desc = "Standart kalite, dengeli görünüm.";
+            else if (factor === 1.5) desc = "Yüksek kalite, pürüzsüz yüzey.";
 
             if (elements.qualityDesc) elements.qualityDesc.textContent = desc;
 

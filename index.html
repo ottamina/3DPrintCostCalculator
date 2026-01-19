@@ -85,7 +85,10 @@
                     <h3>Model Boyutları</h3>
                     <div class="dimensions-grid">
 
-                        <span class="dimension-value" id="dim-x">-- mm</span>
+                        <div class="dimension-item">
+                            <span class="dimension-label">Genişlik (X)</span>
+                            <span class="dimension-value" id="dim-x">-- mm</span>
+                        </div>
                         <div class="dimension-item">
                             <span class="dimension-label">Derinlik (Y)</span>
                             <span class="dimension-value" id="dim-y">-- mm</span>
@@ -105,9 +108,9 @@
                 <div class="info-card">
                     <div class="info-section">
                         <h3>Bilgilendirme</h3>
-                        <p class="info-text">Bu araç, 3D baskı projelerinizin ön maliyet analizini kolaylaştırmak
-                            için geliştirilmiştir. Hesaplanan veriler; seçilen malzeme yoğunluğu, doluluk oranı ve
-                            hacim değerleri üzerinden tahmini olarak sunulur.</p>
+                        <p class="info-text">Bu araç, yerel tarayıcınızda çalışan <strong>Geometrik Tahmin
+                                Motoru</strong> ile 3D modellerinizin (STL) hacim, yüzey alanı ve kütlesini hesaplar.
+                            Yüklenen dosyalar sunucuya gönderilmez, güvenlidir.</p>
                     </div>
                     <div class="tech-section">
                         <h4>Kullanılan Teknolojiler</h4>
@@ -155,10 +158,10 @@
                 <div class="control-card">
                     <h3>Baskı Kalitesi</h3>
                     <div class="infill-presets">
-                        <button class="preset-btn quality-btn" data-factor="0.5">Düşük</button>
+                        <button class="preset-btn quality-btn" data-factor="0.25">Düşük</button>
+                        <button class="preset-btn quality-btn" data-factor="0.5">Orta</button>
                         <button class="preset-btn quality-btn active" data-factor="1.0">Standart</button>
                         <button class="preset-btn quality-btn" data-factor="1.5">Yüksek</button>
-                        <button class="preset-btn quality-btn" data-factor="2.0">Ultra</button>
                     </div>
                     <div class="quality-info"
                         style="margin-top: 8px; font-size: 0.85rem; color: #94a3b8; text-align: center;">
@@ -205,7 +208,7 @@
                         </div>
                         <div class="price-row">
                             <span id="labor-label">Hizmet Bedeli</span>
-                            <span id="labor-cost-display">50 ₺</span>
+                            <span id="labor-cost-display">-- ₺</span>
                         </div>
                         <div class="price-divider"></div>
                         <div class="price-row total">
