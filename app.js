@@ -34,8 +34,8 @@ const elements = {
     dimHeight: document.getElementById('dim-z'),
     volumeDisplay: document.getElementById('volume'),
     weightDisplay: document.getElementById('weight-display'),
-    materialCostDisplay: document.getElementById('material-cost'),
-    laborCostDisplay: document.getElementById('labor-cost'),
+    materialCostDisplay: document.getElementById('material-cost-display'),
+    laborCostDisplay: document.getElementById('labor-cost-display'),
     totalPrice: document.getElementById('total-price'),
     loader: document.getElementById('loader'),
     changeModelBtn: document.getElementById('change-model-btn')
