@@ -348,9 +348,12 @@ async function getWeightFromCura() {
         top_layers: 4,
         bottom_layers: 4,
         infill_sparse_density: parseInt(elements.infillSlider.value),
+        infill_line_distance: 0, // Density'nin aktif olması için 0 yapılmalı
         material_density: MATERIALS[elements.materialSelect.value].density,
         speed_print: 60,
     };
+
+    console.log("Slicing with settings:", settings);
 
     const { metadata } = await slicer.slice(settings);
 
