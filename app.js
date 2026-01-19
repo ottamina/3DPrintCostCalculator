@@ -32,55 +32,27 @@ const elements = {
     laborCostDisplay: document.getElementById('labor-cost-display'),
     totalPrice: document.getElementById('total-price'),
     loader: document.getElementById('loader'),
-    // Print settings (hidden, controlled by quality profile)
-    wallCount: document.getElementById('wall-count'),
-    layerHeight: document.getElementById('layer-height'),
-    lineWidth: document.getElementById('line-width'),
-    topLayers: document.getElementById('top-layers'),
-    bottomLayers: document.getElementById('bottom-layers')
+    layerHeight: document.getElementById('layer-height')
 };
 
-// Quality Profile Presets
+// Quality Profile Presets - Sadece layer height içerir, işçilik dinamik hesaplanır
 const QUALITY_PROFILES = {
-    low: {
-        name: 'Düşük',
-        layerHeight: 0.28,
-        wallCount: 2,
-        lineWidth: 0.5,
-        topLayers: 3,
-        bottomLayers: 3,
-        laborCost: 20
-    },
-    standard: {
-        name: 'Standart',
-        layerHeight: 0.20,
-        wallCount: 3,
-        lineWidth: 0.4,
-        topLayers: 4,
-        bottomLayers: 4,
-        laborCost: 40
-    },
-    dynamic: {
-        name: 'Dinamik',
-        layerHeight: 0.16,
-        wallCount: 4,
-        lineWidth: 0.4,
-        topLayers: 5,
-        bottomLayers: 5,
-        laborCost: 60
-    },
-    super: {
-        name: 'Super',
-        layerHeight: 0.12,
-        wallCount: 5,
-        lineWidth: 0.4,
-        topLayers: 6,
-        bottomLayers: 6,
-        laborCost: 100
-    }
+    low: { name: 'Düşük', layerHeight: 0.28 },
+    standard: { name: 'Standart', layerHeight: 0.20 },
+    dynamic: { name: 'Dinamik', layerHeight: 0.16 },
+    super: { name: 'Super', layerHeight: 0.12 }
 };
 
 let currentQuality = 'standard';
+
+// Dinamik işçilik hesaplama - Layer height düştükçe işçilik artar
+// Mantık: Daha ince katman = daha fazla katman sayısı = daha uzun süre
+function calculateLaborCost(layerHeight) {
+    const baseCost = 20;  // 0.28mm için baz maliyet
+    const baseLayerHeight = 0.28;
+    const multiplier = baseLayerHeight / layerHeight;
+    return Math.round(baseCost * multiplier);
+}
 
 // Three.js Setup 
 let scene, camera, renderer, controls, currentMesh;
@@ -299,15 +271,14 @@ function updateDimensions(x, y, z) {
     elements.dimZ.textContent = z.toFixed(2) + ' mm';
 }
 
-// ===== Cost Calculation (Cura-like algorithm) =====
-// Cura uses: Material Volume = Shell Volume + (Interior Volume × Infill)
-// Shell Volume = Surface Area × Wall Thickness (approximated)
-// Interior Volume = Total Volume - Shell Volume
+// ===== Cost Calculation (Cura Approach) =====
+// Basit formül: Ağırlık = Hacim × Doluluk × Yoğunluk
 function calculateCost() {
     if (modelVolume === 0) {
         elements.weightDisplay.textContent = '-- g';
         elements.materialCostDisplay.textContent = '-- ₺';
         elements.totalPrice.textContent = '-- ₺';
+        elements.laborCostDisplay.textContent = '-- ₺'; // Also clear labor cost
         return;
     }
 
@@ -318,44 +289,20 @@ function calculateCost() {
     // Get infill percentage
     const infill = parseInt(elements.infillSlider.value) / 100;
 
-    // Get print settings from current quality profile
+    // Get current quality profile
     const profile = QUALITY_PROFILES[currentQuality];
-    const wallCount = profile.wallCount;
-    const layerHeight = profile.layerHeight;
-    const lineWidth = profile.lineWidth;
-    const topLayers = profile.topLayers;
-    const bottomLayers = profile.bottomLayers;
-    const laborCost = profile.laborCost;
 
-    // Calculate shell thicknesses in mm
-    const wallThickness = wallCount * lineWidth;
-    const topBottomThickness = (topLayers + bottomLayers) * layerHeight;
-
-    // Cura-like shell volume calculation:
-    // Shell volume = Surface Area × Average Shell Thickness
-    // We use wall thickness as primary, adjusted for top/bottom
-    const avgShellThickness = (wallThickness * 2 + topBottomThickness) / 3;
-
-    // Shell volume from surface area (mm³)
-    // Surface area is already calculated during model load
-    let shellVolume = modelSurfaceArea * avgShellThickness;
-
-    // Clamp shell volume to not exceed total volume (for small/thin models)
-    shellVolume = Math.min(shellVolume, modelVolume * 0.95);
-
-    // Interior volume is what remains after shell
-    const interiorVolume = Math.max(0, modelVolume - shellVolume);
-
-    // Total material volume: full shell + infill portion of interior
-    const materialVolume = shellVolume + (interiorVolume * infill);
-
-    // Convert mm³ to cm³ and calculate weight in grams
-    const volumeCm3 = materialVolume / 1000;
-    const weight = volumeCm3 * material.density;
+    // Cura yaklaşımı: Hacim × Doluluk × Yoğunluk
+    // mm³ to cm³ conversion: / 1000
+    const volumeCm3 = modelVolume / 1000;
+    const weight = volumeCm3 * infill * material.density;
 
     // Calculate material cost
     const pricePerGram = material.pricePerKg / 1000;
     const materialCost = weight * pricePerGram;
+
+    // Dinamik işçilik hesaplama (layer height'e göre)
+    const laborCost = calculateLaborCost(profile.layerHeight);
 
     // Calculate total
     const totalCost = materialCost + laborCost;
@@ -452,16 +399,13 @@ function applyQualityProfile(quality) {
 
     currentQuality = quality;
 
-    // Update hidden inputs
+    // Update hidden input
     elements.layerHeight.value = profile.layerHeight;
-    elements.wallCount.value = profile.wallCount;
-    elements.lineWidth.value = profile.lineWidth;
-    elements.topLayers.value = profile.topLayers;
-    elements.bottomLayers.value = profile.bottomLayers;
-    elements.laborCostValue.value = profile.laborCost;
 
-    // Update labor cost display in price breakdown
-    elements.laborCostDisplay.textContent = profile.laborCost + ' ₺';
+    // Calculate dynamic labor cost
+    const laborCost = calculateLaborCost(profile.layerHeight);
+    elements.laborCostValue.value = laborCost;
+    elements.laborCostDisplay.textContent = laborCost + ' ₺';
 
     // Update active button
     elements.qualityBtns.forEach(btn => {
