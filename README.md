@@ -2,7 +2,7 @@
 
 A modern, browser-based 3D print cost calculator that uses **Cura-like algorithms** to accurately estimate filament weight and printing costs. Simply drag & drop your STL file and get instant cost predictions!
 
-![3D Print Cost Calculator](https://img.shields.io/badge/version-1.0.0-blue)
+![3D Print Cost Calculator](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Made with](https://img.shields.io/badge/made%20with-Three.js-black)
 
@@ -12,14 +12,21 @@ A modern, browser-based 3D print cost calculator that uses **Cura-like algorithm
 - 📁 **Drag & Drop STL Upload** - Simply drag your STL file or click to browse
 - 🎨 **Interactive 3D Viewer** - Rotate, zoom, and inspect your model in real-time
 - 🌙 **Dark/Light Theme** - Beautiful UI with theme switching
-- ⚙️ **Customizable Print Settings**:
-  - Wall count
-  - Layer height
-  - Line width
-  - Top/Bottom layers
-  - Infill percentage
+- 🎚️ **Quality Profiles** - Choose from Low, Medium, or High quality presets
 - 💰 **Multiple Materials** - PLA, ABS, PETG with customizable prices
 - 📱 **Responsive Design** - Works on desktop and mobile
+
+## 🎚️ Quality Profiles
+
+The calculator includes three quality profiles that automatically configure all print settings:
+
+| Profile | Layer Height | Walls | Top/Bottom | Labor Cost |
+|---------|--------------|-------|------------|------------|
+| **Low** | 0.3 mm | 2 | 3 layers | 25 ₺ |
+| **Medium** | 0.2 mm | 4 | 4 layers | 50 ₺ |
+| **High** | 0.12 mm | 5 | 6 layers | 100 ₺ |
+
+Simply select a profile and all settings are applied automatically - no manual configuration needed!
 
 ## 🧮 How It Calculates
 
@@ -46,7 +53,7 @@ This provides much more accurate estimates because:
    ```
 2. Open `index.html` in your browser
 3. Drag & drop an STL file
-4. Adjust settings and see the cost!
+4. Select a quality profile and see the cost!
 
 ### No Installation Required
 This is a pure client-side application. Just open `index.html` in any modern browser!
@@ -84,27 +91,6 @@ A = Σ 0.5 × |AB × AC|
 ├── app.js          # Application logic & calculations
 └── README.md       # This file
 ```
-
-## ⚙️ Default Settings
-
-| Setting | Default Value |
-|---------|---------------|
-| Material | PLA |
-| Infill | 20% |
-| Wall Count | 4 |
-| Layer Height | 0.2 mm |
-| Line Width | 0.4 mm |
-| Top Layers | 4 |
-| Bottom Layers | 4 |
-| Labor Cost | 50 ₺ |
-
-## 🎨 Screenshots
-
-### Dark Theme
-Experience a sleek, modern dark interface perfect for extended use.
-
-### Light Theme  
-Switch to light theme for better visibility in bright environments.
 
 ## 🤝 Contributing
 
