@@ -53,8 +53,8 @@ setupEventListeners();
 function initThreeJS() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000); // Black background
-    scene.fog = new THREE.Fog(0x000000, 200, 1000);
+    scene.background = new THREE.Color(0x12121a);
+    scene.fog = new THREE.Fog(0x12121a, 200, 1000);
 
     // Camera
     const aspect = elements.viewerContainer.clientWidth / elements.viewerContainer.clientHeight;
