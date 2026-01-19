@@ -1203,20 +1203,46 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    background: rgba(99, 102, 241, 0.1);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
     padding: 0.5rem 1rem;
     border-radius: var(--radius-sm);
     border: 1px solid var(--accent-primary);
+    background: rgba(99, 102, 241, 0.1);
+    transition: var(--transition-fast);
 }
 
-.order-contact a {
+.order-contact span {
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% auto;
+    animation: gradientShift 3s ease infinite;
+}
+
+.order-contact svg {
     color: var(--accent-primary);
-    text-decoration: none;
-    font-weight: 600;
 }
 
-.order-contact a:hover {
-    text-decoration: underline;
+.order-contact:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: var(--accent-secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+}
+
+@keyframes gradientShift {
+    0% {
+        background-position: 0% center;
+    }
+
+    50% {
+        background-position: 100% center;
+    }
+
+    100% {
+        background-position: 0% center;
+    }
 }
