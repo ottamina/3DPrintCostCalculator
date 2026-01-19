@@ -579,6 +579,89 @@ body::before {
     font-weight: 500;
 }
 
+/* Quality Profile Section */
+.quality-profile-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.quality-btn {
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.quality-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.quality-btn.active {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="light"] .quality-btn {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .quality-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .quality-btn.active {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* Profile Info Section */
+.profiles-section h4 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.4rem;
+}
+
+.profile-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.profile-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-sm);
+}
+
+.profile-info-name {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.profile-info-details {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+}
+
+[data-theme="light"] .profile-info-item {
+    background: rgba(0, 0, 0, 0.02);
+}
+
 /* Print Settings Grid */
 .print-settings-grid {
     display: grid;
@@ -907,8 +990,8 @@ body::before {
     padding: 0.5rem 0.75rem;
     backdrop-filter: blur(10px);
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
 }
 
 .info-section h3,

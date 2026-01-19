@@ -25,19 +25,53 @@ const elements = {
     infillSlider: document.getElementById('infill-slider'),
     infillValue: document.getElementById('infill-value'),
     presetBtns: document.querySelectorAll('.preset-btn'),
-    laborCost: document.getElementById('labor-cost'),
+    qualityBtns: document.querySelectorAll('.quality-btn'),
+    laborCostValue: document.getElementById('labor-cost-value'),
     weightDisplay: document.getElementById('weight-display'),
     materialCostDisplay: document.getElementById('material-cost-display'),
     laborCostDisplay: document.getElementById('labor-cost-display'),
     totalPrice: document.getElementById('total-price'),
     loader: document.getElementById('loader'),
-    // New print settings
+    // Print settings (hidden, controlled by quality profile)
     wallCount: document.getElementById('wall-count'),
     layerHeight: document.getElementById('layer-height'),
     lineWidth: document.getElementById('line-width'),
     topLayers: document.getElementById('top-layers'),
     bottomLayers: document.getElementById('bottom-layers')
 };
+
+// Quality Profile Presets
+const QUALITY_PROFILES = {
+    low: {
+        name: 'Düşük',
+        layerHeight: 0.3,
+        wallCount: 2,
+        lineWidth: 0.5,
+        topLayers: 3,
+        bottomLayers: 3,
+        laborCost: 25
+    },
+    medium: {
+        name: 'Orta',
+        layerHeight: 0.2,
+        wallCount: 4,
+        lineWidth: 0.4,
+        topLayers: 4,
+        bottomLayers: 4,
+        laborCost: 50
+    },
+    high: {
+        name: 'Yüksek',
+        layerHeight: 0.12,
+        wallCount: 5,
+        lineWidth: 0.4,
+        topLayers: 6,
+        bottomLayers: 6,
+        laborCost: 100
+    }
+};
+
+let currentQuality = 'medium';
 
 // Three.js Setup 
 let scene, camera, renderer, controls, currentMesh;
@@ -279,8 +313,8 @@ function calculateCost() {
     const topLayers = parseInt(elements.topLayers.value) || 4;
     const bottomLayers = parseInt(elements.bottomLayers.value) || 4;
 
-    // Get labor cost
-    const laborCost = parseFloat(elements.laborCost.value) || 0;
+    // Get labor cost from current quality profile
+    const laborCost = QUALITY_PROFILES[currentQuality].laborCost;
 
     // Calculate shell thickness
     const wallThickness = wallCount * lineWidth; // mm
@@ -406,15 +440,37 @@ elements.presetBtns.forEach(btn => {
     });
 });
 
-// Labor cost
-elements.laborCost.addEventListener('input', calculateCost);
+// Quality profile buttons
+function applyQualityProfile(quality) {
+    const profile = QUALITY_PROFILES[quality];
+    if (!profile) return;
 
-// Print settings
-elements.wallCount.addEventListener('input', calculateCost);
-elements.layerHeight.addEventListener('input', calculateCost);
-elements.lineWidth.addEventListener('input', calculateCost);
-elements.topLayers.addEventListener('input', calculateCost);
-elements.bottomLayers.addEventListener('input', calculateCost);
+    currentQuality = quality;
+
+    // Update hidden inputs
+    elements.layerHeight.value = profile.layerHeight;
+    elements.wallCount.value = profile.wallCount;
+    elements.lineWidth.value = profile.lineWidth;
+    elements.topLayers.value = profile.topLayers;
+    elements.bottomLayers.value = profile.bottomLayers;
+    elements.laborCostValue.value = profile.laborCost;
+
+    // Update labor cost display in price breakdown
+    elements.laborCostDisplay.textContent = profile.laborCost + ' ₺';
+
+    // Update active button
+    elements.qualityBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.quality === quality);
+    });
+
+    calculateCost();
+}
+
+elements.qualityBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        applyQualityProfile(btn.dataset.quality);
+    });
+});
 
 // ===== Theme Toggle =====
 const themeToggle = document.getElementById('theme-toggle');
@@ -453,6 +509,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scene.background = new THREE.Color(bgColor);
     }
 
-    // Set initial labor cost display
-    elements.laborCostDisplay.textContent = elements.laborCost.value + ' ₺';
+    // Apply initial quality profile
+    applyQualityProfile('medium');
 });

@@ -93,15 +93,13 @@
                     </div>
                 </div>
 
-                <!-- Bilgilendirme & Teknolojiler -->
+                <!-- Bilgilendirme & Profiller -->
                 <div class="info-card">
                     <div class="info-section">
                         <h3>Bilgilendirme</h3>
                         <p class="info-text">Bu araç, 3D baskı projelerinizin ön maliyet analizini kolaylaştırmak
                             için geliştirilmiştir. Hesaplanan veriler; seçilen malzeme yoğunluğu, doluluk oranı ve
-                            hacim değerleri üzerinden tahmini olarak sunulur. Üretim sürecindeki dilimleme (slicing)
-                            ayarları ve destek yapıları maliyette küçük değişikliklere neden olabilir. Kesin
-                            fiyatlandırma ve teknik uygunluk kontrolü için uzman görüşü almanız önerilir.</p>
+                            hacim değerleri üzerinden tahmini olarak sunulur.</p>
                     </div>
                     <div class="tech-section">
                         <h4>Kullanılan Teknolojiler</h4>
@@ -112,7 +110,7 @@
                             </div>
                             <div class="tech-item">
                                 <span class="tech-icon tech-js">JS</span>
-                                <span>JavaScript (ES6+)</span>
+                                <span>JavaScript</span>
                             </div>
                             <div class="tech-item">
                                 <span class="tech-icon tech-html">H5</span>
@@ -121,6 +119,26 @@
                             <div class="tech-item">
                                 <span class="tech-icon tech-stl">STL</span>
                                 <span>STL Parser</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profiles-section">
+                        <h4>Kalite Profilleri</h4>
+                        <div class="profile-info-grid">
+                            <div class="profile-info-item">
+                                <span class="profile-info-name">Düşük</span>
+                                <span class="profile-info-details">0.3mm katman • 2 duvar • 3 üst/alt • 25₺
+                                    işçilik</span>
+                            </div>
+                            <div class="profile-info-item">
+                                <span class="profile-info-name">Orta</span>
+                                <span class="profile-info-details">0.2mm katman • 4 duvar • 4 üst/alt • 50₺
+                                    işçilik</span>
+                            </div>
+                            <div class="profile-info-item">
+                                <span class="profile-info-name">Yüksek</span>
+                                <span class="profile-info-details">0.12mm katman • 5 duvar • 6 üst/alt • 100₺
+                                    işçilik</span>
                             </div>
                         </div>
                     </div>
@@ -166,50 +184,19 @@
 
 
                 <div class="control-card">
-                    <h3>Baskı Ayarları</h3>
-                    <div class="print-settings-grid">
-                        <div class="setting-item">
-                            <label for="wall-count">Duvar Sayısı</label>
-                            <div class="input-wrapper small">
-                                <input type="number" id="wall-count" value="4" min="1" max="10" step="1">
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label for="layer-height">Katman Yüksekliği</label>
-                            <div class="input-wrapper small">
-                                <input type="number" id="layer-height" value="0.2" min="0.1" max="0.4" step="0.05">
-                                <span class="input-suffix">mm</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label for="line-width">Çizgi Genişliği</label>
-                            <div class="input-wrapper small">
-                                <input type="number" id="line-width" value="0.4" min="0.2" max="1.0" step="0.05">
-                                <span class="input-suffix">mm</span>
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label for="top-layers">Üst Katman</label>
-                            <div class="input-wrapper small">
-                                <input type="number" id="top-layers" value="4" min="1" max="20" step="1">
-                            </div>
-                        </div>
-                        <div class="setting-item">
-                            <label for="bottom-layers">Alt Katman</label>
-                            <div class="input-wrapper small">
-                                <input type="number" id="bottom-layers" value="4" min="1" max="20" step="1">
-                            </div>
-                        </div>
+                    <h3>Baskı Kalitesi</h3>
+                    <div class="quality-profile-selector">
+                        <button class="quality-btn" data-quality="low">Düşük</button>
+                        <button class="quality-btn active" data-quality="medium">Orta</button>
+                        <button class="quality-btn" data-quality="high">Yüksek</button>
                     </div>
-                </div>
-
-
-                <div class="control-card">
-                    <h3>İşçilik Ücreti</h3>
-                    <div class="input-wrapper">
-                        <input type="number" id="labor-cost" value="50" min="0" step="10">
-                        <span class="input-suffix">₺</span>
-                    </div>
+                    <!-- Hidden inputs for print settings - controlled by quality profile -->
+                    <input type="hidden" id="wall-count" value="4">
+                    <input type="hidden" id="layer-height" value="0.2">
+                    <input type="hidden" id="line-width" value="0.4">
+                    <input type="hidden" id="top-layers" value="4">
+                    <input type="hidden" id="bottom-layers" value="4">
+                    <input type="hidden" id="labor-cost-value" value="50">
                 </div>
 
 
