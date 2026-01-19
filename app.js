@@ -10,13 +10,16 @@ const MATERIALS = {
     'PETG': { density: 1.27, pricePerKg: 700 }
 };
 
-const LABOR_COST = 50; // Sabit İşçilik (TL)
+const LABOR_COST = 50; // Sabit Hizmet Bedeli (TL)
 
 // --- STATE ---
 let scene, camera, renderer, controls;
 let currentMesh = null;
-let rawStlBuffer = null; // Cura için binary data
 let debounceTimer = null;
+
+// Global Model Data (Cura yerine Geometrik Hesaplama için)
+let modelVolumeMm3 = 0;
+let modelSurfaceAreaMm2 = 0;
 
 // --- ELEMENTS ---
 const elements = {
@@ -79,7 +82,7 @@ function initThreeJS() {
     scene.add(dirLight);
 
     // Grid (Zemin)
-    const gridHelper = new THREE.GridHelper(400, 40, 0xcccccc, 0xe5e5e5);
+    const gridHelper = new THREE.GridHelper(400, 40, 0x333333, 0x444444); // Darker grid
     scene.add(gridHelper);
 
     // Animation Loop
@@ -124,9 +127,9 @@ function setupEventListeners() {
             btn.classList.toggle('active', parseInt(btn.dataset.value) == val)
         );
 
-        // Debounced Calculation
+        // Instant Calculation (Fast Debounce)
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(calculateCost, 100); // 100ms gecikme
+        debounceTimer = setTimeout(calculateCost, 100); // 100ms
     });
 
     // Material Select
@@ -157,27 +160,30 @@ function loadFile(file) {
 
     const reader = new FileReader();
     reader.onload = function (e) {
-        rawStlBuffer = e.target.result; // Keep for Cura
-
+        const buffer = e.target.result;
         const loader = new STLLoader();
-        const geometry = loader.parse(rawStlBuffer);
+        const geometry = loader.parse(buffer);
 
-        // 1. Center Geometry & Fix Position
-        geometry.center(); // Geometriyi (0,0,0)'a ortala
+        // 1. Center & Fix Position
+        geometry.center();
         geometry.computeBoundingBox();
         const box = geometry.boundingBox;
         const size = new THREE.Vector3();
         box.getSize(size);
 
-        // UI Update
+        // UI Update (Dimensions)
         elements.dimLength.textContent = size.x.toFixed(1);
         elements.dimHeight.textContent = size.y.toFixed(1);
         elements.dimWidth.textContent = size.z.toFixed(1);
 
-        const volumeCm3 = getGeometricVolume(geometry) / 1000;
+        // 2. Pre-calculate Geometric Data for "Cura-like" Estimation
+        modelVolumeMm3 = getGeometricVolume(geometry);
+        modelSurfaceAreaMm2 = getGeometricSurfaceArea(geometry);
+
+        const volumeCm3 = modelVolumeMm3 / 1000;
         elements.volumeDisplay.textContent = volumeCm3.toFixed(2) + ' cm³';
 
-        // 2. Setup Mesh
+        // 3. Setup Mesh
         if (currentMesh) {
             scene.remove(currentMesh);
             currentMesh.geometry.dispose();
@@ -194,14 +200,10 @@ function loadFile(file) {
         currentMesh.castShadow = true;
         currentMesh.receiveShadow = true;
 
-        // Zemin hizalama ( Alt nokta 0'a, yani Y pozitif alana)
-        // geometry.center() sonrası Y min = -size.y/2.
-        // Onu 0 yapmak için mesh'i size.y/2 kadar kaldır.
+        // Place on floor (Y=0)
         currentMesh.position.y = size.y / 2;
 
         scene.add(currentMesh);
-
-        // Camera Fit
         fitCamera(size);
 
         // UI States
@@ -215,58 +217,47 @@ function loadFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-async function calculateCost() {
-    if (!rawStlBuffer) return;
+function calculateCost() {
+    // Veri yoksa çık
+    if (modelVolumeMm3 === 0) return;
 
-    showLoader(true, "Hesaplanıyor...");
+    showLoader(true);
 
     try {
-        // --- 1. Ağırlık Hesabı (Cura WASM) ---
-        // Dinamik import ile yükle (sadece gerektiğinde)
-        const { CuraWASM } = await import('https://esm.sh/cura-wasm');
+        const infill = parseInt(elements.infillSlider.value) / 100;
+        const material = MATERIALS[elements.materialSelect.value];
+        const laborCost = LABOR_COST;
 
-        const slicer = new CuraWASM({ definition: 'ultimaker_s5' });
-        await slicer.loadModel(rawStlBuffer, 'model.stl');
+        // --- Geometrik Tahmin Algoritması (Cura Alternatifi) ---
+        // Kabuk Kalınlığı: 0.8mm (2 Duvar)
+        const shellThickness = 0.8;
 
-        const settings = {
-            // Tuned Settings (Clean & Linear)
-            layer_height: 0.20,
-            wall_line_count: 2,
-            top_layers: 4,
-            bottom_layers: 4,
-            infill_sparse_density: parseInt(elements.infillSlider.value),
-            infill_pattern: 'grid',      // Stabil model
-            gradual_infill_steps: 0,     // Lineerlik için
-            minimum_infill_area: 0,
-            support_enable: false,       // Destek yok
-            support_infill_rate: 0,
-            infill_overlap: 5,
-            material_density: MATERIALS[elements.materialSelect.value].density,
-            speed_print: 60
-        };
+        // Kabuk Hacmi (Yaklaşık): Yüzey Alanı * Kalınlık
+        const shellVolumeMm3 = modelSurfaceAreaMm2 * shellThickness;
 
-        const { metadata } = await slicer.slice(settings);
+        // İç Hacim (Infill uygulanacak alan)
+        let interiorVolumeMm3 = modelVolumeMm3 - shellVolumeMm3;
+        if (interiorVolumeMm3 < 0) interiorVolumeMm3 = 0; // İnce modeller için koruma
 
-        let weight = metadata.filament_weight;
-        if (!weight && metadata.filament_amount) {
-            // Fallback: mm3 -> gram
-            const rho = MATERIALS[elements.materialSelect.value].density;
-            weight = (metadata.filament_amount / 1000) * rho;
-        }
+        // Toplam Dolu Hacim
+        const filledVolumeMm3 = shellVolumeMm3 + (interiorVolumeMm3 * infill);
 
-        // --- 2. Fiyat Hesabı ---
-        const materialData = MATERIALS[elements.materialSelect.value];
-        const materialCost = weight * (materialData.pricePerKg / 1000);
-        const total = materialCost + LABOR_COST;
+        // Ağırlık Hesabı (mm3 -> cm3 -> g)
+        const volumeCm3 = filledVolumeMm3 / 1000;
+        const weight = volumeCm3 * material.density;
 
-        // --- 3. UI Update ---
+        // Fiyat
+        const materialCost = weight * (material.pricePerKg / 1000);
+        const totalCost = materialCost + laborCost;
+
+        // UI Update
         elements.weightDisplay.textContent = Math.round(weight) + ' g';
         elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
-        elements.laborCostDisplay.textContent = LABOR_COST + ' ₺';
-        elements.totalPrice.textContent = Math.ceil(total) + ' ₺';
+        elements.laborCostDisplay.textContent = laborCost + ' ₺';
+        elements.totalPrice.textContent = Math.ceil(totalCost) + ' ₺';
 
-    } catch (err) {
-        console.error("Hesaplama Hatası:", err);
+    } catch (e) {
+        console.error("Hesaplama hatası:", e);
         elements.totalPrice.textContent = "Hata!";
     } finally {
         showLoader(false);
@@ -278,36 +269,53 @@ async function calculateCost() {
 function showLoader(show, text = "Yükleniyor...") {
     if (elements.loader) {
         elements.loader.style.display = show ? 'block' : 'none';
-        // Text update opsiyonel
     }
-    if (elements.totalPrice && show) elements.totalPrice.textContent = text;
+    // Fiyat metnini bozmaya gerek yok, loader animasyonu yeterli
 }
 
 function getGeometricVolume(geometry) {
-    // Basit hacim hesabı (Three.js için Tetrahedon yöntemi)
-    let position = geometry.attributes.position;
-    let faces = position.count / 3;
-    let sum = 0;
-    let p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
+    const pos = geometry.attributes.position;
+    if (!pos) return 0;
 
-    for (let i = 0; i < faces; i++) {
-        p1.fromBufferAttribute(position, i * 3 + 0);
-        p2.fromBufferAttribute(position, i * 3 + 1);
-        p3.fromBufferAttribute(position, i * 3 + 2);
+    let sum = 0;
+    const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
+
+    for (let i = 0; i < pos.count; i += 3) {
+        p1.fromBufferAttribute(pos, i);
+        p2.fromBufferAttribute(pos, i + 1);
+        p3.fromBufferAttribute(pos, i + 2);
         sum += p1.dot(p2.cross(p3));
     }
-    return Math.abs(sum / 6.0);
+    return Math.abs(sum / 6.0); // mm3
+}
+
+function getGeometricSurfaceArea(geometry) {
+    const pos = geometry.attributes.position;
+    if (!pos) return 0;
+
+    let area = 0;
+    const p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
+    const ab = new THREE.Vector3(), ac = new THREE.Vector3();
+
+    for (let i = 0; i < pos.count; i += 3) {
+        p1.fromBufferAttribute(pos, i);
+        p2.fromBufferAttribute(pos, i + 1);
+        p3.fromBufferAttribute(pos, i + 2);
+
+        ab.subVectors(p2, p1);
+        ac.subVectors(p3, p1);
+        area += ab.cross(ac).length() / 2;
+    }
+    return area; // mm2
 }
 
 function fitCamera(size) {
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = camera.fov * (Math.PI / 180);
-    const cameraZ = Math.abs(maxDim / 2 * Math.tan(fov * 2)); // Biraz yaklaştır
 
-    // İzometrik bakış
-    const dist = maxDim * 2.5;
+    const dist = maxDim * 2.0;
     camera.position.set(dist, dist, dist);
-    camera.lookAt(0, size.y / 2, 0); // Modelin ortasına bak
+    camera.lookAt(0, size.y / 2, 0);
     controls.target.set(0, size.y / 2, 0);
     controls.update();
 }
