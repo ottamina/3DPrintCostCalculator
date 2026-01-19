@@ -143,16 +143,13 @@ function loadSTL(file) {
         currentMesh.castShadow = true;
         currentMesh.receiveShadow = true;
 
-        // Center the model
+        // Center the geometry (Vertex bazlı ortalama)
+        geometry.center();
         geometry.computeBoundingBox();
-        const boundingBox = geometry.boundingBox;
-        const center = new THREE.Vector3();
-        boundingBox.getCenter(center);
-        currentMesh.position.sub(center);
 
         // Calculate dimensions
         const size = new THREE.Vector3();
-        boundingBox.getSize(size);
+        geometry.boundingBox.getSize(size);
 
         // Update UI with dimensions
         updateDimensions(size.x, size.y, size.z);
@@ -167,7 +164,7 @@ function loadSTL(file) {
         // Store dimensions
         modelDimensions = { x: size.x, y: size.y, z: size.z };
 
-        // Position model on grid
+        // Position model on floor (En alt nokta 0 olacak şekilde)
         currentMesh.position.y = size.y / 2;
 
         scene.add(currentMesh);
