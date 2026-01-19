@@ -600,12 +600,7 @@ body::before {
     font-weight: 500;
 }
 
-/* Quality Profile Section */
-.quality-profile-selector {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-}
+
 
 .quality-btn {
     padding: 0.5rem 0.75rem;
@@ -645,100 +640,7 @@ body::before {
     background: rgba(99, 102, 241, 0.1);
 }
 
-/* Profile Info Section */
-.profiles-section h4 {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.4rem;
-}
 
-.profile-info-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.profile-info-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.3rem 0.5rem;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: var(--radius-sm);
-}
-
-.profile-info-name {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--accent-primary);
-}
-
-.profile-info-details {
-    font-size: 0.55rem;
-    color: var(--text-muted);
-}
-
-[data-theme="light"] .profile-info-item {
-    background: rgba(0, 0, 0, 0.02);
-}
-
-/* Print Settings Grid */
-.print-settings-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-}
-
-.setting-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.setting-item label {
-    font-size: 0.6rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.input-wrapper.small {
-    position: relative;
-}
-
-.input-wrapper.small input {
-    width: 100%;
-    padding: 0.35rem 0.4rem;
-    padding-right: 1.8rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 0.8rem;
-    transition: var(--transition-fast);
-}
-
-.input-wrapper.small input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-}
-
-.input-wrapper.small .input-suffix {
-    right: 0.4rem;
-    font-size: 0.65rem;
-}
-
-[data-theme="light"] .input-wrapper.small input {
-    background: rgba(0, 0, 0, 0.03);
-}
-
-@media (max-width: 576px) {
-    .print-settings-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
 
 .price-card {
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
