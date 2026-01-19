@@ -1,528 +1,313 @@
-/**
- * 3D Print Cost Calculator
- * STL dosyalarını yükleyip baskı maliyetini hesaplayan uygulama
- */
 
-// Material Data 
+import * as THREE from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+import { STLLoader } from 'https://unpkg.com/three@0.157.0/examples/jsm/loaders/STLLoader.js';
+
+// --- CONFIGURATION ---
 const MATERIALS = {
-    PLA: { density: 1.24, pricePerKg: 700 },
-    ABS: { density: 1.04, pricePerKg: 700 },
-    PETG: { density: 1.27, pricePerKg: 700 }
+    'PLA': { density: 1.24, pricePerKg: 700 }, // g/cm3, TL
+    'ABS': { density: 1.04, pricePerKg: 700 },
+    'PETG': { density: 1.27, pricePerKg: 700 }
 };
 
-//  DOM Elements 
+const LABOR_COST = 50; // Sabit İşçilik (TL)
+
+// --- STATE ---
+let scene, camera, renderer, controls;
+let currentMesh = null;
+let rawStlBuffer = null; // Cura için binary data
+let debounceTimer = null;
+
+// --- ELEMENTS ---
 const elements = {
-    viewerContainer: document.getElementById('viewer-container'),
     dropzone: document.getElementById('dropzone'),
     fileInput: document.getElementById('file-input'),
-    canvas: document.getElementById('three-canvas'),
-    dimensionsCard: document.getElementById('dimensions-card'),
-    dimX: document.getElementById('dim-x'),
-    dimY: document.getElementById('dim-y'),
-    dimZ: document.getElementById('dim-z'),
-    volume: document.getElementById('volume'),
+    canvas: document.getElementById('model-viewer'),
+    viewerContainer: document.getElementById('viewer-container'),
     materialSelect: document.getElementById('material-select'),
     infillSlider: document.getElementById('infill-slider'),
     infillValue: document.getElementById('infill-value'),
     presetBtns: document.querySelectorAll('.preset-btn'),
+    // Outputs
+    dimLength: document.getElementById('dim-length'),
+    dimWidth: document.getElementById('dim-width'),
+    dimHeight: document.getElementById('dim-height'),
+    volumeDisplay: document.getElementById('volume-display'),
     weightDisplay: document.getElementById('weight-display'),
-    materialCostDisplay: document.getElementById('material-cost-display'),
-    laborCostDisplay: document.getElementById('labor-cost-display'),
+    materialCostDisplay: document.getElementById('material-cost'),
+    laborCostDisplay: document.getElementById('labor-cost'),
     totalPrice: document.getElementById('total-price'),
-    loader: document.getElementById('loader')
+    loader: document.getElementById('loader'),
+    changeModelBtn: document.getElementById('change-model-btn')
 };
 
-// 3. İşçilik Hesabı (SABİT 50 TL)
-// calculateLaborCost fonksiyonu kaldırıldı, recalculateMatrix içinde sabit değer kullanılıyor.
-
-
-// Three.js Setup 
-let scene, camera, renderer, controls, currentMesh;
-let modelVolume = 0;
-let modelSurfaceArea = 0;
-let modelDimensions = { x: 0, y: 0, z: 0 };
-let rawStlBuffer = null; // Ham STL verisi (Slicing için gerekli)
+// --- INITIALIZATION ---
+initThreeJS();
+setupEventListeners();
 
 function initThreeJS() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x12121a);
+    scene.background = new THREE.Color(0xf5f5f7); // Light gray
+    scene.fog = new THREE.Fog(0xf5f5f7, 200, 1000);
 
     // Camera
     const aspect = elements.viewerContainer.clientWidth / elements.viewerContainer.clientHeight;
-    camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 10000);
-    camera.position.set(100, 100, 200);
+    camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 2000);
+    camera.position.set(150, 150, 150);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({
-        canvas: elements.canvas,
-        antialias: true,
-        alpha: true
-    });
+    renderer = new THREE.WebGLRenderer({ canvas: elements.canvas, antialias: true });
     renderer.setSize(elements.viewerContainer.clientWidth, elements.viewerContainer.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(100, 200, 100);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    const fillLight = new THREE.DirectionalLight(0x6366f1, 0.3);
-    fillLight.position.set(-100, 50, -100);
-    scene.add(fillLight);
-
-    // Grid Helper
-    const gridHelper = new THREE.GridHelper(200, 20, 0x6366f1, 0x2a2a3a);
-    gridHelper.position.y = -0.5;
-    scene.add(gridHelper);
-
     // Controls
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 10;
-    controls.maxDistance = 1000;
 
-    // Animation loop
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(100, 200, 100);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    // Grid (Zemin)
+    const gridHelper = new THREE.GridHelper(400, 40, 0xcccccc, 0xe5e5e5);
+    scene.add(gridHelper);
+
+    // Animation Loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
     animate();
 
-    // Resize handler
-    window.addEventListener('resize', onWindowResize);
+    // Resize Handle
+    window.addEventListener('resize', () => {
+        const w = elements.viewerContainer.clientWidth;
+        const h = elements.viewerContainer.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+    });
 }
 
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+function setupEventListeners() {
+    // File Upload
+    elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+    elements.fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
+
+    // Drag & Drop
+    elements.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); elements.dropzone.classList.add('dragover'); });
+    elements.dropzone.addEventListener('dragleave', () => elements.dropzone.classList.remove('dragover'));
+    elements.dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        elements.dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+    });
+
+    // Infill Slider
+    elements.infillSlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        elements.infillValue.textContent = val + '%';
+
+        // Update presets
+        elements.presetBtns.forEach(btn =>
+            btn.classList.toggle('active', parseInt(btn.dataset.value) == val)
+        );
+
+        // Debounced Calculation
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(calculateCost, 300); // 300ms gecikme
+    });
+
+    // Material Select
+    elements.materialSelect.addEventListener('change', calculateCost);
+
+    // Presets
+    elements.presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            elements.infillSlider.value = btn.dataset.value;
+            elements.infillSlider.dispatchEvent(new Event('input'));
+        });
+    });
+
+    // Change Model Button
+    if (elements.changeModelBtn) {
+        elements.changeModelBtn.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+    }
 }
 
-function onWindowResize() {
-    const width = elements.viewerContainer.clientWidth;
-    const height = elements.viewerContainer.clientHeight;
+// --- LOGIC ---
 
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
-}
+function loadFile(file) {
+    if (!file) return;
 
-// ===== STL Loading =====
-function loadSTL(file) {
-    showLoader(true);
+    showLoader(true, "Model Yükleniyor...");
 
     const reader = new FileReader();
-    reader.onload = function (event) {
-        const contents = event.target.result;
-        rawStlBuffer = contents; // Slicing için sakla
+    reader.onload = function (e) {
+        rawStlBuffer = e.target.result; // Keep for Cura
 
-        const loader = new THREE.STLLoader();
-        const geometry = loader.parse(contents);
+        const loader = new STLLoader();
+        const geometry = loader.parse(rawStlBuffer);
 
-        // Remove existing mesh
+        // 1. Center Geometry & Fix Position
+        geometry.center(); // Geometriyi (0,0,0)'a ortala
+        geometry.computeBoundingBox();
+        const box = geometry.boundingBox;
+        const size = new THREE.Vector3();
+        box.getSize(size);
+
+        // UI Update
+        elements.dimLength.textContent = size.x.toFixed(1);
+        elements.dimHeight.textContent = size.y.toFixed(1);
+        elements.dimWidth.textContent = size.z.toFixed(1);
+
+        const volumeCm3 = getGeometricVolume(geometry) / 1000;
+        elements.volumeDisplay.textContent = volumeCm3.toFixed(2) + ' cm³';
+
+        // 2. Setup Mesh
         if (currentMesh) {
             scene.remove(currentMesh);
             currentMesh.geometry.dispose();
             currentMesh.material.dispose();
         }
 
-        // Create material
         const material = new THREE.MeshStandardMaterial({
             color: 0x6366f1,
-            metalness: 0.1,
-            roughness: 0.6,
-            flatShading: false
+            roughness: 0.5,
+            metalness: 0.1
         });
 
-        // Create mesh
         currentMesh = new THREE.Mesh(geometry, material);
         currentMesh.castShadow = true;
         currentMesh.receiveShadow = true;
 
-        // Center the geometry (Vertex bazlı ortalama)
-        geometry.center();
-        geometry.computeBoundingBox();
-
-        // Calculate dimensions
-        const size = new THREE.Vector3();
-        geometry.boundingBox.getSize(size);
-
-        // Update UI with dimensions
-        updateDimensions(size.x, size.y, size.z);
-
-        // Calculate volume
-        modelVolume = calculateVolume(geometry);
-        elements.volume.textContent = (modelVolume / 1000).toFixed(2) + ' cm³';
-
-        // Calculate surface area for shell estimation
-        modelSurfaceArea = calculateSurfaceArea(geometry);
-
-        // Store dimensions
-        modelDimensions = { x: size.x, y: size.y, z: size.z };
-
-        // Position model on floor (En alt nokta 0 olacak şekilde)
+        // Zemin hizalama ( Alt nokta 0'a, yani Y pozitif alana)
+        // geometry.center() sonrası Y min = -size.y/2.
+        // Onu 0 yapmak için mesh'i size.y/2 kadar kaldır.
         currentMesh.position.y = size.y / 2;
 
         scene.add(currentMesh);
 
-        // Fit camera to model
-        fitCameraToObject(currentMesh);
+        // Camera Fit
+        fitCamera(size);
 
-        // Show canvas, hide dropzone
+        // UI States
         elements.canvas.classList.add('visible');
         elements.dropzone.classList.add('hidden');
-        elements.dimensionsCard.classList.add('active');
+        if (elements.changeModelBtn) elements.changeModelBtn.classList.add('visible');
 
-        // Show change model button
-        document.getElementById('change-model-btn').classList.add('visible');
-
-        // Calculate cost
+        // Initial Calculation
         calculateCost();
-
-        showLoader(false);
     };
-
     reader.readAsArrayBuffer(file);
 }
 
-function fitCameraToObject(object) {
-    const boundingBox = new THREE.Box3().setFromObject(object);
-    const size = new THREE.Vector3();
-    boundingBox.getSize(size);
+async function calculateCost() {
+    if (!rawStlBuffer) return;
 
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    const cameraDistance = Math.abs(maxDim / Math.sin(fov / 2)) * 1.2;
-
-    camera.position.set(cameraDistance * 0.5, cameraDistance * 0.5, cameraDistance * 0.8);
-    controls.target.set(0, size.y / 2, 0);
-    controls.update();
-}
-
-// ===== Volume Calculation (Signed Tetrahedron Method) =====
-function calculateVolume(geometry) {
-    let volume = 0;
-    const positions = geometry.attributes.position.array;
-
-    // Iterate through each triangle
-    for (let i = 0; i < positions.length; i += 9) {
-        // Get vertices
-        const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
-        const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5]);
-        const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8]);
-
-        // Calculate signed volume of tetrahedron
-        volume += signedVolumeOfTriangle(v1, v2, v3);
-    }
-
-    return Math.abs(volume);
-}
-
-function signedVolumeOfTriangle(p1, p2, p3) {
-    return p1.dot(p2.clone().cross(p3)) / 6.0;
-}
-
-// ===== Surface Area Calculation =====
-function calculateSurfaceArea(geometry) {
-    let area = 0;
-    const positions = geometry.attributes.position.array;
-
-    for (let i = 0; i < positions.length; i += 9) {
-        const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
-        const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5]);
-        const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8]);
-
-        // Triangle area = 0.5 * |AB x AC|
-        const ab = v2.clone().sub(v1);
-        const ac = v3.clone().sub(v1);
-        area += ab.cross(ac).length() * 0.5;
-    }
-
-    return area;
-}
-
-// ===== Dimensions Update =====
-function updateDimensions(x, y, z) {
-    elements.dimX.textContent = x.toFixed(2) + ' mm';
-    elements.dimY.textContent = y.toFixed(2) + ' mm';
-    elements.dimZ.textContent = z.toFixed(2) + ' mm';
-}
-
-// ===== Logic & Calculations =====
-
-/**
- * Ana hesaplama fonksiyonu (Orchestrator)
- * Ağırlığı ve işçiliği ayrı ayrı hesaplayıp UI'ı günceller.
- */
-async function recalculateMatrix() {
-    if (modelVolume === 0) {
-        updateUIDisplay(0, 0, 0, 0);
-        return;
-    }
-
-    showLoader(true);
-    elements.totalPrice.textContent = 'Hesaplanıyor...';
+    showLoader(true, "Hesaplanıyor...");
 
     try {
-        // 1. Ağırlık Hesabı (Kaliteden Bağımsız - Standart Ayarlar)
-        // Önce Cura WASM dene, olmazsa Geometrik Tahmin yap
-        let weight = 0;
-        try {
-            weight = await getWeightFromCura();
-        } catch (e) {
-            console.warn("Cura hatası, tahmini hesaplamaya geçiliyor:", e);
-            weight = getWeightFromEstimation();
+        // --- 1. Ağırlık Hesabı (Cura WASM) ---
+        // Dinamik import ile yükle (sadece gerektiğinde)
+        const { CuraWASM } = await import('https://esm.sh/cura-wasm');
+
+        const slicer = new CuraWASM({ definition: 'ultimaker_s5' });
+        await slicer.loadModel(rawStlBuffer, 'model.stl');
+
+        const settings = {
+            // Tuned Settings (Clean & Linear)
+            layer_height: 0.20,
+            wall_line_count: 2,
+            top_layers: 4,
+            bottom_layers: 4,
+            infill_sparse_density: parseInt(elements.infillSlider.value),
+            infill_pattern: 'grid',      // Stabil model
+            gradual_infill_steps: 0,     // Lineerlik için
+            minimum_infill_area: 0,
+            support_enable: false,       // Destek yok
+            support_infill_rate: 0,
+            infill_overlap: 5,
+            material_density: MATERIALS[elements.materialSelect.value].density,
+            speed_print: 60
+        };
+
+        const { metadata } = await slicer.slice(settings);
+
+        let weight = metadata.filament_weight;
+        if (!weight && metadata.filament_amount) {
+            // Fallback: mm3 -> gram
+            const rho = MATERIALS[elements.materialSelect.value].density;
+            weight = (metadata.filament_amount / 1000) * rho;
         }
 
-        // 2. Malzeme Maliyeti
-        const material = MATERIALS[elements.materialSelect.value];
-        const pricePerGram = material.pricePerKg / 1000;
-        const materialCost = weight * pricePerGram;
+        // --- 2. Fiyat Hesabı ---
+        const materialData = MATERIALS[elements.materialSelect.value];
+        const materialCost = weight * (materialData.pricePerKg / 1000);
+        const total = materialCost + LABOR_COST;
 
-        // 3. İşçilik Hesabı (SABİT)
-        const laborCost = 50;
+        // --- 3. UI Update ---
+        elements.weightDisplay.textContent = Math.round(weight) + ' g';
+        elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
+        elements.laborCostDisplay.textContent = LABOR_COST + ' ₺';
+        elements.totalPrice.textContent = Math.ceil(total) + ' ₺';
 
-        // 4. Toplam
-        const totalCost = materialCost + laborCost;
-
-        updateUIDisplay(weight, materialCost, laborCost, totalCost);
-
-    } catch (error) {
-        console.error("Hesaplama hatası:", error);
-        elements.totalPrice.textContent = 'Hata!';
+    } catch (err) {
+        console.error("Hesaplama Hatası:", err);
+        elements.totalPrice.textContent = "Hata!";
     } finally {
         showLoader(false);
     }
 }
 
-/**
- * Yöntem A: Cura WASM ile Ağırlık Hesabı
- * Her zaman standart ayarlarla (0.2mm, 3 duvar) çalışır.
- */
-async function getWeightFromCura() {
-    if (!rawStlBuffer) throw new Error("STL verisi yok");
+// --- HELPERS ---
 
-    // Kütüphaneyi yükle
-    const { CuraWASM } = await import('https://esm.sh/cura-wasm');
-
-    // Slicer oluştur
-    const slicer = new CuraWASM({
-        definition: 'ultimaker_s5',
-    });
-
-    await slicer.loadModel(rawStlBuffer, 'model.stl');
-
-    // SABİT STANDART AYARLAR (Masaüstü Cura Standartlarına Ayarlandı)
-    const settings = {
-        // 1. Destekleri Tamamen Kapat
-        support_enable: false,
-        support_infill_rate: 0,
-
-        // 2. Infill Tuning (Düşük Doluluk Hassasiyeti)
-        gradual_infill_steps: 0,        // Kademeli dolguyu kapat
-        infill_enable_travel_optimization: false,
-        minimum_infill_area: 0,         // Küçük alanları %100 doldurmayı engelle
-        infill_before_walls: false,
-        infill_overlap: 5,              // Bindirmeyi azalt
-        skin_overlap: 5,
-
-        // 3. Standart Ayarlar
-        layer_height: 0.20,
-        wall_line_count: 2,     // 2 Duvar
-        top_layers: 4,
-        bottom_layers: 4,
-        infill_sparse_density: parseInt(elements.infillSlider.value),
-        infill_line_distance: 0,
-        infill_pattern: 'grid',
-        material_density: MATERIALS[elements.materialSelect.value].density,
-        speed_print: 60,
-    };
-
-    console.log("Slicing with settings:", settings);
-
-    const { metadata } = await slicer.slice(settings);
-
-    // Convert to Grams
-    if (metadata.filament_weight) {
-        return metadata.filament_weight;
-    } else if (metadata.filament_amount) {
-        const material = MATERIALS[elements.materialSelect.value];
-        const volumeCm3 = metadata.filament_amount / 1000;
-        return volumeCm3 * material.density;
-    } else {
-        throw new Error("Metadata okunamadı");
+function showLoader(show, text = "Yükleniyor...") {
+    if (elements.loader) {
+        elements.loader.style.display = show ? 'block' : 'none';
+        // Text update opsiyonel
     }
+    if (elements.totalPrice && show) elements.totalPrice.textContent = text;
 }
 
-/**
- * Yöntem B: Geometrik Tahmin ile Ağırlık Hesabı (Fallback)
- * Her zaman standart ayarlarla (0.2mm, 3 duvar) çalışır.
- */
-function getWeightFromEstimation() {
-    const infill = parseInt(elements.infillSlider.value) / 100;
-    const material = MATERIALS[elements.materialSelect.value];
+function getGeometricVolume(geometry) {
+    // Basit hacim hesabı (Three.js için Tetrahedon yöntemi)
+    let position = geometry.attributes.position;
+    let faces = position.count / 3;
+    let sum = 0;
+    let p1 = new THREE.Vector3(), p2 = new THREE.Vector3(), p3 = new THREE.Vector3();
 
-    // SABİT STANDART AYARLAR
-    const nozzleSize = 0.4;
-    const fixedWallCount = 2;
-    const fixedLayerHeight = 0.20;
-    const fixedTopLayers = 4;
-    const fixedBottomLayers = 4;
-
-    // Kabuk Hacmi Hesabı
-    const wallThick = fixedWallCount * nozzleSize;
-    const topThick = fixedTopLayers * fixedLayerHeight;
-    const bottomThick = fixedBottomLayers * fixedLayerHeight;
-    const avgShellThick = (wallThick + topThick + bottomThick) / 2;
-
-    let shellVolume = modelSurfaceArea * avgShellThick;
-    if (shellVolume > modelVolume) shellVolume = modelVolume;
-
-    // Malzeme Hacmi
-    const interiorVolume = Math.max(0, modelVolume - shellVolume);
-    const materialVolume = shellVolume + (interiorVolume * infill); // Kabuk %100, İç %Infill
-
-    const volumeCm3 = materialVolume / 1000;
-    return volumeCm3 * material.density;
+    for (let i = 0; i < faces; i++) {
+        p1.fromBufferAttribute(position, i * 3 + 0);
+        p2.fromBufferAttribute(position, i * 3 + 1);
+        p3.fromBufferAttribute(position, i * 3 + 2);
+        sum += p1.dot(p2.cross(p3));
+    }
+    return Math.abs(sum / 6.0);
 }
 
-// UI Yardımcısı
-function updateUIDisplay(weight, materialCost, laborCost, totalCost) {
-    elements.weightDisplay.textContent = weight.toFixed(2) + ' g';
-    elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
-    elements.laborCostDisplay.textContent = laborCost.toFixed(2) + ' ₺';
-    elements.totalPrice.textContent = totalCost.toFixed(2) + ' ₺';
+function fitCamera(size) {
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    const cameraZ = Math.abs(maxDim / 2 * Math.tan(fov * 2)); // Biraz yaklaştır
+
+    // İzometrik bakış
+    const dist = maxDim * 2.5;
+    camera.position.set(dist, dist, dist);
+    camera.lookAt(0, size.y / 2, 0); // Modelin ortasına bak
+    controls.target.set(0, size.y / 2, 0);
+    controls.update();
 }
-
-// İşçilik fonksiyonu kaldırıldı (Sabit 50 TL)
-
-// ===== Loader =====
-function showLoader(show) {
-    if (show) {
-        elements.loader.classList.add('visible');
-    } else {
-        elements.loader.classList.remove('visible');
-    }
-}
-
-// ===== Event Listeners =====
-
-// Drag and drop
-elements.dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.add('dragover');
-});
-
-elements.dropzone.addEventListener('dragleave', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.remove('dragover');
-});
-
-elements.dropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.remove('dragover');
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0 && files[0].name.toLowerCase().endsWith('.stl')) {
-        loadSTL(files[0]);
-    }
-});
-
-// Click to upload
-elements.dropzone.addEventListener('click', () => {
-    elements.fileInput.click();
-});
-
-// Change model button
-const changeModelBtn = document.getElementById('change-model-btn');
-changeModelBtn.addEventListener('click', () => {
-    elements.fileInput.click();
-});
-
-elements.fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        loadSTL(e.target.files[0]);
-    }
-});
-
-// Material select
-elements.materialSelect.addEventListener('change', recalculateMatrix);
-
-// Infill slider (Debounce eklendi)
-let debounceTimer;
-elements.infillSlider.addEventListener('input', (e) => {
-    elements.infillValue.textContent = e.target.value + '%';
-
-    // Update active preset button
-    elements.presetBtns.forEach(btn => {
-        btn.classList.toggle('active', parseInt(btn.dataset.value) === parseInt(e.target.value));
-    });
-
-    // Hesaplamayı gecikmeli başlat (Performans için)
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-        recalculateMatrix();
-    }, 800);
-});
-
-// Preset buttons
-elements.presetBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const value = parseInt(btn.dataset.value);
-        elements.infillSlider.value = value;
-        elements.infillValue.textContent = value + '%';
-
-        elements.presetBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        recalculateMatrix();
-    });
-});
-
-// Quality profile buttons listener removed
-
-
-// ===== Theme Toggle =====
-const themeToggle = document.getElementById('theme-toggle');
-
-function updateTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-
-    // Update Three.js scene background
-    if (scene) {
-        const bgColor = theme === 'light' ? 0xe2e8f0 : 0x12121a;
-        scene.background = new THREE.Color(bgColor);
-    }
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    updateTheme(newTheme);
-}
-
-// Theme toggle button click
-themeToggle.addEventListener('click', toggleTheme);
-
-// ===== Initialize =====
-document.addEventListener('DOMContentLoaded', () => {
-    // Load saved theme or default to dark
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    updateTheme(savedTheme);
-
-    initThreeJS();
-
-    // Apply saved theme to Three.js after init
-    const bgColor = savedTheme === 'light' ? 0xe2e8f0 : 0x12121a;
-    if (scene) {
-        scene.background = new THREE.Color(bgColor);
-    }
-
-    // Apply initial quality profile removed
-
-});
