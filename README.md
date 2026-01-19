@@ -9,24 +9,26 @@ A modern, browser-based 3D print cost calculator that uses **Cura WASM Engine** 
 
 ## ✨ Features
 
-- 🎯 **Real-Time Slicing** - Uses actual **Cura Engine** (via WASM) running in your browser for 100% accuracy
+- 🎯 **Real-Time Slicing** - Uses actual **Cura Engine** (via WASM) for accurate weight calculation
+- ⚖️ **Consistent Weight** - Weight calculation uses standardized settings (0.2mm, 3 walls) regardless of quality profile
 - 🔄 **Smart Fallback** - If slicing fails, automatically falls back to advanced geometric estimation
 - 📁 **Drag & Drop STL Upload** - Simply drag your STL file or click to browse
 - 🎨 **Interactive 3D Viewer** - Rotate, zoom, and inspect your model in real-time
 - 🌙 **Dark/Light Theme** - Beautiful UI with theme switching
-- 🎚️ **4 Quality Profiles** - Automatically configures layer height, walls, infill, and speed
+- 🎚️ **4 Quality Profiles** - Affects **Labor Cost** only (via Layer Height)
 - 💰 **Detailed Cost Breakdown** - Material weight + Dynamic Labor Cost
 
 ## 🎚️ Quality Profiles
 
-Profiles determine both print quality and slicing parameters:
+Quality profiles adjust the Layer Height which directly impacts the print time and Labor Cost. 
+**Note:** Weight calculation is standardized (based on Standard profile) so changing quality does not affect the material usage, only the labor cost.
 
-| Profile | Layer Height | Walls | Labor Cost |
-|---------|--------------|-------|------------|
-| **Düşük** | 0.28 mm | 2 | 20 ₺ |
-| **Standart** | 0.20 mm | 3 | 28 ₺ |
-| **Dinamik** | 0.16 mm | 4 | 35 ₺ |
-| **Super** | 0.12 mm | 5 | 47 ₺ |
+| Profile | Layer Height | Labor Cost |
+|---------|--------------|------------|
+| **Düşük** | 0.28 mm | 20 ₺ |
+| **Standart** | 0.20 mm | 28 ₺ |
+| **Dinamik** | 0.16 mm | 35 ₺ |
+| **Super** | 0.12 mm | 47 ₺ |
 
 ## 🚀 How It Works
 

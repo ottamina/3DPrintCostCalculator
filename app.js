@@ -36,36 +36,12 @@ const elements = {
 };
 
 // Quality Profile Presets - Sadece layer height içerir, işçilik dinamik hesaplanır
-// Quality Profile Presets - UI'da sadece layer height görünür ancak hesaplama için profil detayları kullanılır
+// Quality Profile Presets - Sadece layer height içerir (İşçilik hesabı için)
 const QUALITY_PROFILES = {
-    low: {
-        name: 'Düşük',
-        layerHeight: 0.28,
-        wallCount: 2,     // Arka plan hesaplama değeri
-        topLayers: 3,     // Arka plan hesaplama değeri
-        bottomLayers: 3   // Arka plan hesaplama değeri
-    },
-    standard: {
-        name: 'Standart',
-        layerHeight: 0.20,
-        wallCount: 3,
-        topLayers: 4,
-        bottomLayers: 4
-    },
-    dynamic: {
-        name: 'Dinamik',
-        layerHeight: 0.16,
-        wallCount: 4,
-        topLayers: 5,
-        bottomLayers: 5
-    },
-    super: {
-        name: 'Super',
-        layerHeight: 0.12,
-        wallCount: 5,
-        topLayers: 6,
-        bottomLayers: 6
-    }
+    low: { name: 'Düşük', layerHeight: 0.28 },
+    standard: { name: 'Standart', layerHeight: 0.20 },
+    dynamic: { name: 'Dinamik', layerHeight: 0.16 },
+    super: { name: 'Super', layerHeight: 0.12 }
 };
 
 let currentQuality = 'standard';
@@ -301,7 +277,7 @@ function updateDimensions(x, y, z) {
 // ===== Cost Calculation (Advanced: Cura WASM + Fallback) =====
 
 // Cura WASM Slicing Helper
-async function sliceModel(stlBuffer, profile) {
+async function sliceModel(stlBuffer) {
     try {
         // Dinamik import ile kütüphaneyi çek (CDN)
         const { CuraWASM } = await import('https://esm.sh/cura-wasm');
@@ -314,23 +290,20 @@ async function sliceModel(stlBuffer, profile) {
         // Dosyayı yükle
         await slicer.loadModel(stlBuffer, 'model.stl');
 
-        // Ayarları hazırla
+        // SABİT AYARLAR (Ağırlık Standardizasyonu İçin)
+        // Profil ne olursa olsun ağırlık aynı kalmalı
         const settings = {
-            layer_height: profile.layerHeight,
-            wall_line_count: profile.wallCount,
-            top_layers: profile.topLayers,
-            bottom_layers: profile.bottomLayers,
-            infill_sparse_density: parseInt(elements.infillSlider.value),
+            layer_height: 0.2,      // Sabit Standart
+            wall_line_count: 3,     // Sabit Standart
+            top_layers: 4,          // Sabit Standart
+            bottom_layers: 4,       // Sabit Standart
+            infill_sparse_density: parseInt(elements.infillSlider.value), // Değişken (Kullanıcı seçimi)
             material_density: MATERIALS[elements.materialSelect.value].density,
             speed_print: 60,
         };
 
         // Dilimle
         const { metadata } = await slicer.slice(settings);
-
-        // Metadata'dan filament kullanımını (mm) al
-        // Genelde 'filament_used' veya benzeri bir field döner
-        // Cura Engine çıktısı: flavor, time, filament_total_length vb.
         return metadata;
     } catch (error) {
         throw error;
@@ -365,11 +338,11 @@ async function calculateCostWithCura() {
     // UI'da bilgi ver
     elements.totalPrice.textContent = 'Hesaplanıyor...';
 
-    // Profili al
+    // Profili al (sadece işçilik için layerHeight gerekli)
     const profile = QUALITY_PROFILES[currentQuality];
 
-    // Dilimle
-    const metadata = await sliceModel(rawStlBuffer, profile);
+    // Dilimle (sabit ayarlar kullanılacak)
+    const metadata = await sliceModel(rawStlBuffer);
 
     // Filament uzunluğu (mm) -> Ağırlık (g) çevirimi
     // Filament çapı varsayılan 1.75mm veya 2.85mm (CuraEngine genelde 2.85 kullanır ama ayarlara bağlı)
@@ -401,37 +374,44 @@ async function calculateCostWithCura() {
     updateUIDisplay(weight, materialCost, laborCost, totalCost);
 }
 
-// Yöntem 2: Geometrik Tahmin (Eski Yöntem - Fallback)
+// Yöntem 2: Geometrik Tahmin (Fallback)
 function calculateCostEstimation() {
-    // Get selected material
     const materialType = elements.materialSelect.value;
     const material = MATERIALS[materialType];
-
-    // Get infill percentage
     const infill = parseInt(elements.infillSlider.value) / 100;
-
-    // Get current quality profile
     const profile = QUALITY_PROFILES[currentQuality];
 
-    // Kabuk hesaplamaları (Eski mantık)
+    // SABİT DEĞERLER (Profil bağımsız standart hesaplama)
     const nozzleSize = 0.4;
-    const wallThick = profile.wallCount * nozzleSize;
-    const topThick = profile.topLayers * profile.layerHeight;
-    const bottomThick = profile.bottomLayers * profile.layerHeight;
+    const fixedWallCount = 3;
+    const fixedTopLayers = 4;
+    const fixedBottomLayers = 4;
+    const fixedLayerHeight = 0.2;
+
+    // Kabuk hesaplamaları
+    const wallThick = fixedWallCount * nozzleSize;
+    const topThick = fixedTopLayers * fixedLayerHeight;
+    const bottomThick = fixedBottomLayers * fixedLayerHeight;
     const avgShellThick = (wallThick + topThick + bottomThick) / 2;
 
+    // Kabuk hacmi
     let shellVolume = modelSurfaceArea * avgShellThick;
     if (shellVolume > modelVolume) shellVolume = modelVolume;
 
+    // İç hacim ve malzeme hacmi
     const interiorVolume = Math.max(0, modelVolume - shellVolume);
     const materialVolume = shellVolume + (interiorVolume * infill);
 
+    // Ağırlık ve Maliyet
     const volumeCm3 = materialVolume / 1000;
     const weight = volumeCm3 * material.density;
 
     const pricePerGram = material.pricePerKg / 1000;
     const materialCost = weight * pricePerGram;
+
+    // İşçilik (Hala profile bağlı dinamik)
     const laborCost = calculateLaborCost(profile.layerHeight);
+
     const totalCost = materialCost + laborCost;
 
     updateUIDisplay(weight, materialCost, laborCost, totalCost);
