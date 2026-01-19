@@ -274,155 +274,145 @@ function updateDimensions(x, y, z) {
     elements.dimZ.textContent = z.toFixed(2) + ' mm';
 }
 
-// ===== Cost Calculation (Advanced: Cura WASM + Fallback) =====
+// ===== Logic & Calculations =====
 
-// Cura WASM Slicing Helper
-async function sliceModel(stlBuffer) {
-    try {
-        // Dinamik import ile kütüphaneyi çek (CDN)
-        const { CuraWASM } = await import('https://esm.sh/cura-wasm');
-
-        // Slicer örneği oluştur
-        const slicer = new CuraWASM({
-            definition: 'ultimaker_s5', // Standart bir yazıcı tanımı
-        });
-
-        // Dosyayı yükle
-        await slicer.loadModel(stlBuffer, 'model.stl');
-
-        // SABİT AYARLAR (Ağırlık Standardizasyonu İçin)
-        // Profil ne olursa olsun ağırlık aynı kalmalı
-        const settings = {
-            layer_height: 0.2,      // Sabit Standart
-            wall_line_count: 3,     // Sabit Standart
-            top_layers: 4,          // Sabit Standart
-            bottom_layers: 4,       // Sabit Standart
-            infill_sparse_density: parseInt(elements.infillSlider.value), // Değişken (Kullanıcı seçimi)
-            material_density: MATERIALS[elements.materialSelect.value].density,
-            speed_print: 60,
-        };
-
-        // Dilimle
-        const { metadata } = await slicer.slice(settings);
-        return metadata;
-    } catch (error) {
-        throw error;
-    }
-}
-
-// Ana Hesaplama Fonksiyonu
-async function calculateCost() {
+/**
+ * Ana hesaplama fonksiyonu (Orchestrator)
+ * Ağırlığı ve işçiliği ayrı ayrı hesaplayıp UI'ı günceller.
+ */
+async function recalculateMatrix() {
     if (modelVolume === 0) {
         updateUIDisplay(0, 0, 0, 0);
         return;
     }
 
-    showLoader(true); // İşlem uzun sürebilir
+    showLoader(true);
+    elements.totalPrice.textContent = 'Hesaplanıyor...';
 
     try {
-        // 1. Önce Gerçek Dilimleme'yi (Cura) dene
-        await calculateCostWithCura();
+        // 1. Ağırlık Hesabı (Kaliteden Bağımsız - Standart Ayarlar)
+        // Önce Cura WASM dene, olmazsa Geometrik Tahmin yap
+        let weight = 0;
+        try {
+            weight = await getWeightFromCura();
+        } catch (e) {
+            console.warn("Cura hatası, tahmini hesaplamaya geçiliyor:", e);
+            weight = getWeightFromEstimation();
+        }
+
+        // 2. Malzeme Maliyeti
+        const material = MATERIALS[elements.materialSelect.value];
+        const pricePerGram = material.pricePerKg / 1000;
+        const materialCost = weight * pricePerGram;
+
+        // 3. İşçilik Hesabı (Kaliteye Bağlı)
+        // Sadece layerHeight işçiliği etkiler
+        const profile = QUALITY_PROFILES[currentQuality];
+        const laborCost = calculateLaborCost(profile.layerHeight);
+
+        // 4. Toplam
+        const totalCost = materialCost + laborCost;
+
+        updateUIDisplay(weight, materialCost, laborCost, totalCost);
+
     } catch (error) {
-        console.warn('Cura slicing failed, falling back to estimation:', error);
-        // Hata olursa (örn: internet yok, wasm hatası) eski yönteme (tahmin) düş
-        calculateCostEstimation();
+        console.error("Hesaplama hatası:", error);
+        elements.totalPrice.textContent = 'Hata!';
     } finally {
         showLoader(false);
     }
 }
 
-// Yöntem 1: Cura WASM ile Gerçek Hesaplama
-async function calculateCostWithCura() {
-    if (!rawStlBuffer) throw new Error("No STL buffer");
+/**
+ * Yöntem A: Cura WASM ile Ağırlık Hesabı
+ * Her zaman standart ayarlarla (0.2mm, 3 duvar) çalışır.
+ */
+async function getWeightFromCura() {
+    if (!rawStlBuffer) throw new Error("STL verisi yok");
 
-    // UI'da bilgi ver
-    elements.totalPrice.textContent = 'Hesaplanıyor...';
+    // Kütüphaneyi yükle
+    const { CuraWASM } = await import('https://esm.sh/cura-wasm');
 
-    // Profili al (sadece işçilik için layerHeight gerekli)
-    const profile = QUALITY_PROFILES[currentQuality];
+    // Slicer oluştur
+    const slicer = new CuraWASM({
+        definition: 'ultimaker_s5',
+    });
 
-    // Dilimle (sabit ayarlar kullanılacak)
-    const metadata = await sliceModel(rawStlBuffer);
+    await slicer.loadModel(rawStlBuffer, 'model.stl');
 
-    // Filament uzunluğu (mm) -> Ağırlık (g) çevirimi
-    // Filament çapı varsayılan 1.75mm veya 2.85mm (CuraEngine genelde 2.85 kullanır ama ayarlara bağlı)
-    // Şimdilik metadata'dan doğrudan ağırlık almayı deneyeceğiz veya hacimden gideceğiz
+    // SABİT STANDART AYARLAR
+    // Kalite profili ne olursa olsun ağırlık hesabı bunlarla yapılır
+    const settings = {
+        layer_height: 0.20,
+        wall_line_count: 3,
+        top_layers: 4,
+        bottom_layers: 4,
+        infill_sparse_density: parseInt(elements.infillSlider.value),
+        material_density: MATERIALS[elements.materialSelect.value].density,
+        speed_print: 60,
+    };
 
-    // NOT: Cura-wasm metadata yapısı kütüphane versiyonuna göre değişebilir.
-    // Standart çıktıda 'filament_weight' varsa onu kullanırız, yoksa 'filament_amount' (mm³) kullanırız.
+    const { metadata } = await slicer.slice(settings);
 
-    let weight = 0;
-    const material = MATERIALS[elements.materialSelect.value];
-
+    // Convert to Grams
     if (metadata.filament_weight) {
-        weight = metadata.filament_weight;
+        return metadata.filament_weight;
     } else if (metadata.filament_amount) {
-        // Amount genelde mm³ cinsindendir (volume)
+        const material = MATERIALS[elements.materialSelect.value];
         const volumeCm3 = metadata.filament_amount / 1000;
-        weight = volumeCm3 * material.density;
+        return volumeCm3 * material.density;
     } else {
-        // Eğer veri çekilemezse hata fırlat ve fallback'e düş
-        throw new Error("Invalid metadata");
+        throw new Error("Metadata okunamadı");
     }
-
-    // Fiyat hesabı
-    const pricePerGram = material.pricePerKg / 1000;
-    const materialCost = weight * pricePerGram;
-    const laborCost = calculateLaborCost(profile.layerHeight);
-    const totalCost = materialCost + laborCost;
-
-    updateUIDisplay(weight, materialCost, laborCost, totalCost);
 }
 
-// Yöntem 2: Geometrik Tahmin (Fallback)
-function calculateCostEstimation() {
-    const materialType = elements.materialSelect.value;
-    const material = MATERIALS[materialType];
+/**
+ * Yöntem B: Geometrik Tahmin ile Ağırlık Hesabı (Fallback)
+ * Her zaman standart ayarlarla (0.2mm, 3 duvar) çalışır.
+ */
+function getWeightFromEstimation() {
     const infill = parseInt(elements.infillSlider.value) / 100;
-    const profile = QUALITY_PROFILES[currentQuality];
+    const material = MATERIALS[elements.materialSelect.value];
 
-    // SABİT DEĞERLER (Profil bağımsız standart hesaplama)
+    // SABİT STANDART AYARLAR
     const nozzleSize = 0.4;
     const fixedWallCount = 3;
+    const fixedLayerHeight = 0.20;
     const fixedTopLayers = 4;
     const fixedBottomLayers = 4;
-    const fixedLayerHeight = 0.2;
 
-    // Kabuk hesaplamaları
+    // Kabuk Hacmi Hesabı
     const wallThick = fixedWallCount * nozzleSize;
     const topThick = fixedTopLayers * fixedLayerHeight;
     const bottomThick = fixedBottomLayers * fixedLayerHeight;
     const avgShellThick = (wallThick + topThick + bottomThick) / 2;
 
-    // Kabuk hacmi
     let shellVolume = modelSurfaceArea * avgShellThick;
     if (shellVolume > modelVolume) shellVolume = modelVolume;
 
-    // İç hacim ve malzeme hacmi
+    // Malzeme Hacmi
     const interiorVolume = Math.max(0, modelVolume - shellVolume);
-    const materialVolume = shellVolume + (interiorVolume * infill);
+    const materialVolume = shellVolume + (interiorVolume * infill); // Kabuk %100, İç %Infill
 
-    // Ağırlık ve Maliyet
     const volumeCm3 = materialVolume / 1000;
-    const weight = volumeCm3 * material.density;
-
-    const pricePerGram = material.pricePerKg / 1000;
-    const materialCost = weight * pricePerGram;
-
-    // İşçilik (Hala profile bağlı dinamik)
-    const laborCost = calculateLaborCost(profile.layerHeight);
-
-    const totalCost = materialCost + laborCost;
-
-    updateUIDisplay(weight, materialCost, laborCost, totalCost);
+    return volumeCm3 * material.density;
 }
 
-// UI Güncelleme Yardımcısı
+// UI Yardımcısı
 function updateUIDisplay(weight, materialCost, laborCost, totalCost) {
     elements.weightDisplay.textContent = weight.toFixed(2) + ' g';
     elements.materialCostDisplay.textContent = materialCost.toFixed(2) + ' ₺';
     elements.laborCostDisplay.textContent = laborCost.toFixed(2) + ' ₺';
     elements.totalPrice.textContent = totalCost.toFixed(2) + ' ₺';
+}
+
+// İşçilik Fonksiyonu
+function calculateLaborCost(layerHeight) {
+    const baseCost = 28; // Standart (0.20mm) için baz maliyet
+    const baseLayerHeight = 0.20;
+    // Katman inceldikçe süre ve maliyet artar
+    const multiplier = baseLayerHeight / layerHeight;
+    return Math.round(baseCost * multiplier);
 }
 
 // ===== Loader =====
@@ -475,7 +465,7 @@ elements.fileInput.addEventListener('change', (e) => {
 });
 
 // Material select
-elements.materialSelect.addEventListener('change', calculateCost);
+elements.materialSelect.addEventListener('change', recalculateMatrix);
 
 // Infill slider
 elements.infillSlider.addEventListener('input', (e) => {
@@ -523,7 +513,7 @@ function applyQualityProfile(quality) {
         btn.classList.toggle('active', btn.dataset.quality === quality);
     });
 
-    calculateCost();
+    recalculateMatrix();
 }
 
 elements.qualityBtns.forEach(btn => {
